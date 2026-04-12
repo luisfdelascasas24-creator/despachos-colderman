@@ -13,6 +13,23 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Despachos" />
   <link rel="manifest" href="manifest.json" />
+  <script>
+    const manifest = {
+      name: "Despachos Colderman",
+      short_name: "Despachos",
+      description: "Gestor de despachos para Colderman",
+      start_url: "/despachos-colderman/",
+      display: "standalone",
+      background_color: "#0f0f0f",
+      theme_color: "#e07b00",
+      icons: [
+        { src: "icon.png", sizes: "192x192", type: "image/png" },
+        { src: "icon.png", sizes: "512x512", type: "image/png" }
+      ]
+    };
+    const blob = new Blob([JSON.stringify(manifest)], {type: "application/json"});
+    document.querySelector('link[rel="manifest"]').href = URL.createObjectURL(blob);
+  </script>
 
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
