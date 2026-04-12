@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Despachos Colderman</title>
+
+  <!-- PWA -->
+  <meta name="theme-color" content="#e07b00" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Despachos" />
+  <link rel="manifest" href="manifest.json" />
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Inter, sans-serif; background: #0f0f0f; color: #f1f1f1; min-height: 100vh; }
+    input, select, textarea, button { font-family: inherit; }
+
+    /* Header */
+    .header { background: #1a1a1a; border-bottom: 1px solid #2a2a2a; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10; }
+    .header-title { font-weight: 700; font-size: 17px; }
+    .header-sub { font-size: 12px; color: #666; margin-top: 2px; }
+
+    /* Buttons */
+    .btn-primary { background: linear-gradient(135deg, #e07b00, #f59e0b); color: #fff; border: none; border-radius: 10px; padding: 11px 18px; font-weight: 700; font-size: 14px; cursor: pointer; }
+    .btn-back { background: none; border: none; color: #aaa; font-size: 22px; cursor: pointer; padding: 4px 8px; }
+    .btn-delete { background: none; border: none; color: #ef4444; font-size: 20px; cursor: pointer; }
+    .btn-estado { width: 100%; border-radius: 10px; padding: 13px 16px; font-size: 15px; font-weight: 600; cursor: pointer; text-align: left; margin-bottom: 10px; border: 1px solid #333; }
+
+    /* Inputs */
+    .field { margin-bottom: 14px; }
+    .field label { font-size: 12px; color: #888; display: block; margin-bottom: 5px; }
+    .field input, .field select, .field textarea {
+      width: 100%; background: #252525; border: 1px solid #333; border-radius: 10px;
+      padding: 11px 12px; color: #fff; font-size: 15px; outline: none;
+    }
+    .field textarea { resize: none; }
+
+    /* Upload */
+    .upload-area { border: 2px dashed #333; border-radius: 14px; padding: 24px; text-align: center; cursor: pointer; background: #1a1a1a; margin-bottom: 14px; }
+    .upload-area img { max-height: 160px; border-radius: 8px; max-width: 100%; }
+
+    /* Cards */
+    .card { background: #1a1a1a; border-radius: 14px; padding: 16px; cursor: pointer; border: 1px solid #2a2a2a; margin-bottom: 10px; }
+
+    /* Counters */
+    .counters { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; padding: 14px 16px 0; }
+    .counter { border-radius: 12px; padding: 10px 8px; text-align: center; cursor: pointer; border: 1px solid #2a2a2a; background: #1a1a1a; }
+    .counter .num { font-size: 22px; font-weight: 700; }
+    .counter .lbl { font-size: 10px; color: #888; margin-top: 2px; }
+
+    /* Badge */
+    .badge { border-radius: 20px; padding: 3px 10px; font-size: 12px; font-weight: 600; border: 1px solid; white-space: nowrap; }
+
+    /* Page */
+    .page { max-width: 600px; margin: 0 auto; padding: 16px; }
+
+    /* Detail rows */
+    .row { display: flex; gap: 8px; margin-bottom: 8px; }
+    .row .lbl { font-size: 13px; color: #666; min-width: 74px; }
+    .row .val { font-size: 13px; color: #ddd; }
+
+    .empty { text-align: center; color: #555; padding: 50px 0; font-size: 15px; }
+    .error-msg { color: #ef4444; font-size: 13px; margin-top: 6px; }
+    .extracting { color: #f59e0b; text-align: center; margin: 8px 0; font-size: 14px; }
+  </style>
+</head>
+<body>
+
+<div id="app"></div>
+
+<script>
+// ── DATA ──────────────────────────────────────────────────────────────────────
+const REGIONES = ["Arica y Parinacota","Tarapacá","Antofagasta","Atacama","Coquimbo",
+  "Valparaíso","Metropolitana","O'Higgins","Maule","Ñuble","Biobío",
+  "La Araucanía","Los Ríos","Los Lagos","Aysén","Magallanes"];
+
+const AGENCIAS = ["Starken","Chilexpress","FedEx","Varmon","Blue Express","Correos Chile","Otra"];
+
+const ESTADOS = {
+  pendiente:  { label: "Pendiente",        color: "#f59e0b", bg: "#2a1f00" },
+  entregado:  { label: "Entregado ✓",      color: "#10b981", bg: "#002a1a" },
+  falta_doc:  { label: "Falta documento",  color: "#ef4444", bg: "#2a0000" },
+};
+
+// ── STORAGE ───────────────────────────────────────────────────────────────────
+function loadDespachos() {
+  try { return JSON.parse(localStorage.getItem("despachos_colderman") || "[]"); } catch { return []; }
+}
+function saveDespachos(arr) {
+  // Guardamos sin imágenes para no saturar localStorage (imagen solo en sesión)
+  const clean = arr.map(d => ({ ...d, imagen: null }));
+  localStorage.setItem("despachos_colderman", JSON.stringify(clean));
+}
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+let state = {
+  despachos: loadDespachos(),
+  view: "lista",        // lista | nuevo | detalle
+  selectedId: null,
+  filtro: "todos",
+  form: { nombre:"", rut:"", destino:"", region:"", agencia:"", notas:"" },
+  imgPreview: null,
+  extracting: false,
+  extractError: "",
+  nextId: Date.now(),
+};
+
+function setState(patch) {
+  Object.assign(state, patch);
+  render();
+}
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+function badge(estado) {
+  const e = ESTADOS[estado];
+  return `<span class="badge" style="color:${e.color};border-color:${e.color};background:${e.bg}">${e.label}</span>`;
+}
+
+function counts() {
+  return {
+    pendiente: state.despachos.filter(d => d.estado === "pendiente").length,
+    entregado: state.despachos.filter(d => d.estado === "entregado").length,
+    falta_doc: state.despachos.filter(d => d.estado === "falta_doc").length,
+  };
+}
+
+// ── ACTIONS ───────────────────────────────────────────────────────────────────
+async function handleFile(file) {
+  if (!file) return;
+  setState({ extractError: "", extracting: true });
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    const base64 = e.target.result.split(",")[1];
+    const mediaType = file.type || "image/jpeg";
+    state.imgPreview = e.target.result;
+    render();
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "anthropic-dangerous-direct-browser-access": "true" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 500,
+          messages: [{
+            role: "user",
+            content: [
+              { type: "image", source: { type: "base64", media_type: mediaType, data: base64 } },
+              { type: "text", text: `Extrae del documento el nombre del cliente o empresa y el RUT si aparece. Responde SOLO en JSON sin backticks:\n{"nombre":"...","rut":"..."}\nSi no encuentras algún dato deja el campo vacío.` }
+            ]
+          }]
+        })
+      });
+      const data = await res.json();
+      const text = (data.content || []).map(b => b.text || "").join("");
+      const parsed = JSON.parse(text.replace(/```json|```/g, "").trim());
+      state.form.nombre = parsed.nombre || "";
+      state.form.rut    = parsed.rut    || "";
+      setState({ extracting: false });
+    } catch {
+      setState({ extracting: false, extractError: "No se pudo extraer. Rellena manualmente." });
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+function guardar() {
+  if (!state.form.nombre.trim()) return;
+  const nuevo = {
+    id: state.nextId++,
+    ...state.form,
+    estado: "pendiente",
+    fecha: new Date().toLocaleDateString("es-CL"),
+    imagen: state.imgPreview,
+  };
+  state.despachos = [nuevo, ...state.despachos];
+  saveDespachos(state.despachos);
+  setState({ view: "lista", form: { nombre:"",rut:"",destino:"",region:"",agencia:"",notas:"" }, imgPreview: null });
+}
+
+function cambiarEstado(id, estado) {
+  state.despachos = state.despachos.map(d => d.id === id ? { ...d, estado } : d);
+  saveDespachos(state.despachos);
+  render();
+}
+
+function eliminar(id) {
+  state.despachos = state.despachos.filter(d => d.id !== id);
+  saveDespachos(state.despachos);
+  setState({ view: "lista", selectedId: null });
+}
+
+// ── RENDER ────────────────────────────────────────────────────────────────────
+function render() {
+  const app = document.getElementById("app");
+  if (state.view === "nuevo")    { app.innerHTML = renderNuevo(); bindNuevo(); return; }
+  if (state.view === "detalle")  { app.innerHTML = renderDetalle(); bindDetalle(); return; }
+  app.innerHTML = renderLista(); bindLista();
+}
+
+// ── VISTA: LISTA ──────────────────────────────────────────────────────────────
+function renderLista() {
+  const c = counts();
+  const filtrados = state.filtro === "todos"
+    ? state.despachos
+    : state.despachos.filter(d => d.estado === state.filtro);
+
+  const cards = filtrados.length === 0
+    ? `<div class="empty">${state.despachos.length === 0 ? "No hay despachos. Agrega el primero." : "Sin resultados."}</div>`
+    : filtrados.map(d => `
+      <div class="card" data-id="${d.id}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div style="flex:1">
+            <div style="font-weight:600;font-size:15px;margin-bottom:3px">${d.nombre}</div>
+            ${d.rut ? `<div style="font-size:12px;color:#666">RUT: ${d.rut}</div>` : ""}
+            <div style="font-size:12px;color:#666;margin-top:4px">${[d.agencia, d.region].filter(Boolean).join(" · ")}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+            ${badge(d.estado)}
+            <span style="font-size:11px;color:#555">${d.fecha}</span>
+          </div>
+        </div>
+      </div>`).join("");
+
+  return `
+    <div class="header">
+      <div>
+        <div class="header-title">📦 Despachos Colderman</div>
+        <div class="header-sub">${state.despachos.length} total</div>
+      </div>
+      <button class="btn-primary" id="btnNuevo">+ Nuevo</button>
+    </div>
+    <div class="counters">
+      ${Object.entries(ESTADOS).map(([k,v]) => `
+        <div class="counter" id="cnt-${k}" style="border-color:${state.filtro===k?v.color:'#2a2a2a'};background:${state.filtro===k?v.bg:'#1a1a1a'}">
+          <div class="num" style="color:${v.color}">${c[k]}</div>
+          <div class="lbl">${v.label}</div>
+        </div>`).join("")}
+    </div>
+    <div class="page">${cards}</div>`;
+}
+
+function bindLista() {
+  document.getElementById("btnNuevo").onclick = () => setState({ view: "nuevo" });
+  Object.keys(ESTADOS).forEach(k => {
+    document.getElementById("cnt-" + k).onclick = () =>
+      setState({ filtro: state.filtro === k ? "todos" : k });
+  });
+  document.querySelectorAll(".card[data-id]").forEach(el => {
+    el.onclick = () => setState({ view: "detalle", selectedId: +el.dataset.id });
+  });
+}
+
+// ── VISTA: NUEVO ──────────────────────────────────────────────────────────────
+function renderNuevo() {
+  return `
+    <div class="header">
+      <button class="btn-back" id="btnBack">←</button>
+      <span style="font-weight:700;font-size:16px">Nuevo Despacho</span>
+      <div style="width:40px"></div>
+    </div>
+    <div class="page">
+      <div class="upload-area" id="uploadArea">
+        ${state.imgPreview
+          ? `<img src="${state.imgPreview}" alt="preview" />`
+          : `<div style="font-size:32px">📎</div><div style="color:#888;font-size:14px;margin-top:8px">Toca para subir captura de factura / cotización</div>`}
+      </div>
+      <input type="file" id="fileInput" accept="image/*" style="display:none" />
+      ${state.extracting ? `<p class="extracting">⏳ Extrayendo datos...</p>` : ""}
+      ${state.extractError ? `<p class="error-msg">${state.extractError}</p>` : ""}
+
+      <div class="field">
+        <label>Nombre del cliente / empresa *</label>
+        <input id="fNombre" value="${state.form.nombre}" placeholder="Extraído o escribe aquí" />
+      </div>
+      <div class="field">
+        <label>RUT</label>
+        <input id="fRut" value="${state.form.rut}" placeholder="Ej: 12.345.678-9" />
+      </div>
+      <div class="field">
+        <label>Agencia de envío</label>
+        <select id="fAgencia">
+          <option value="">Seleccionar agencia...</option>
+          ${AGENCIAS.map(a => `<option ${state.form.agencia===a?"selected":""}>${a}</option>`).join("")}
+        </select>
+      </div>
+      <div class="field">
+        <label>Destino (sucursal o dirección exacta)</label>
+        <input id="fDestino" value="${state.form.destino}" placeholder="Ej: Sucursal Starken Talca" />
+      </div>
+      <div class="field">
+        <label>Región de destino</label>
+        <select id="fRegion">
+          <option value="">Seleccionar región...</option>
+          ${REGIONES.map(r => `<option ${state.form.region===r?"selected":""}>${r}</option>`).join("")}
+        </select>
+      </div>
+      <div class="field">
+        <label>Notas adicionales</label>
+        <textarea id="fNotas" rows="2" placeholder="Observaciones...">${state.form.notas}</textarea>
+      </div>
+      <button class="btn-primary" id="btnGuardar" style="width:100%;padding:14px;font-size:16px">Guardar despacho</button>
+    </div>`;
+}
+
+function bindNuevo() {
+  document.getElementById("btnBack").onclick = () =>
+    setState({ view: "lista", imgPreview: null, form: { nombre:"",rut:"",destino:"",region:"",agencia:"",notas:"" } });
+
+  document.getElementById("uploadArea").onclick = () => document.getElementById("fileInput").click();
+  document.getElementById("fileInput").onchange = e => handleFile(e.target.files[0]);
+
+  ["fNombre","fRut","fDestino","fNotas"].forEach(id => {
+    document.getElementById(id).oninput = e => { state.form[id.replace("f","").toLowerCase()] = e.target.value; };
+  });
+  document.getElementById("fAgencia").onchange = e => { state.form.agencia = e.target.value; };
+  document.getElementById("fRegion").onchange  = e => { state.form.region  = e.target.value; };
+
+  document.getElementById("btnGuardar").onclick = guardar;
+}
+
+// ── VISTA: DETALLE ────────────────────────────────────────────────────────────
+function renderDetalle() {
+  const d = state.despachos.find(x => x.id === state.selectedId);
+  if (!d) return renderLista();
+  return `
+    <div class="header">
+      <button class="btn-back" id="btnBack">←</button>
+      <span style="font-weight:700;font-size:16px">Detalle</span>
+      <button class="btn-delete" id="btnDelete">🗑</button>
+    </div>
+    <div class="page">
+      <div style="background:#1a1a1a;border-radius:14px;padding:20px;margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
+          <div>
+            <div style="font-size:18px;font-weight:700">${d.nombre}</div>
+            ${d.rut ? `<div style="color:#888;font-size:13px">RUT: ${d.rut}</div>` : ""}
+          </div>
+          ${badge(d.estado)}
+        </div>
+        ${d.agencia  ? `<div class="row"><span class="lbl">Agencia</span><span class="val">${d.agencia}</span></div>` : ""}
+        ${d.destino  ? `<div class="row"><span class="lbl">Destino</span><span class="val">${d.destino}</span></div>` : ""}
+        ${d.region   ? `<div class="row"><span class="lbl">Región</span><span class="val">${d.region}</span></div>` : ""}
+        ${d.notas    ? `<div class="row"><span class="lbl">Notas</span><span class="val">${d.notas}</span></div>` : ""}
+        <div class="row"><span class="lbl">Ingresado</span><span class="val">${d.fecha}</span></div>
+      </div>
+      ${d.imagen ? `<img src="${d.imagen}" style="width:100%;border-radius:12px;margin-bottom:16px" />` : ""}
+      <div style="font-size:13px;color:#aaa;font-weight:600;margin-bottom:10px">CAMBIAR ESTADO</div>
+      ${Object.entries(ESTADOS).map(([k,v]) => `
+        <button class="btn-estado" data-estado="${k}"
+          style="color:${v.color};border-color:${d.estado===k?v.color:'#333'};background:${d.estado===k?v.bg:'#1a1a1a'}">
+          ${d.estado===k?"✓ ":""}${v.label}
+        </button>`).join("")}
+    </div>`;
+}
+
+function bindDetalle() {
+  document.getElementById("btnBack").onclick = () => setState({ view: "lista" });
+  document.getElementById("btnDelete").onclick = () => {
+    if (confirm("¿Eliminar este despacho?")) eliminar(state.selectedId);
+  };
+  document.querySelectorAll(".btn-estado[data-estado]").forEach(btn => {
+    btn.onclick = () => { cambiarEstado(state.selectedId, btn.dataset.estado); };
+  });
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+render();
+</script>
+</body>
+</html>
