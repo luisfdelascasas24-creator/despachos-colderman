@@ -119,7 +119,10 @@ function dbEliminar(id,fbKey){
 }
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
-function setState(p){Object.assign(state,p);render();}
+function setState(p){
+  if(window._pasteCleanup){window._pasteCleanup();window._pasteCleanup=null;}
+  Object.assign(state,p);render();
+}
 function badge(e){const v=ESTADOS[e];return`<span class="badge" style="color:${v.color};border-color:${v.color};background:${v.bg}">${v.label}</span>`;}
 function counts(){return{pendiente:state.despachos.filter(d=>d.estado==="pendiente").length,entregado:state.despachos.filter(d=>d.estado==="entregado").length,falta_doc:state.despachos.filter(d=>d.estado==="falta_doc").length};}
 function getResumen(d){
@@ -238,20 +241,34 @@ function renderLista(){
 
   const cards=filtrados.length===0
     ?`<div class="empty">${state.despachos.length===0?"No hay despachos. Agrega el primero.":"Sin resultados."}</div>`
-    :filtrados.map(d=>`
-      <div class="card" data-id="${d.id}" style="border-color:${d.estado==="pendiente"&&d.fecha!==hoy?"#ef444455":"#2a2a2a"}">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+    :filtrados.map(d=>{
+      const agenciaLabel=d.agencia==="Otra..."?(d.agenciaCustom||"Otra"):d.agencia;
+      const empresaLabel=d.empresaNacional==="Otra..."?(d.empresaNacionalCustom||"Otra"):d.empresaNacional;
+      const destinoLabel=d.destino==="provincia"?"📦 Provincia":d.destino==="oficina"?"🏢 Oficina":"🏭 Bodega";
+      const atrasado=d.estado==="pendiente"&&d.fecha!==hoy;
+      return`
+      <div class="card" data-id="${d.id}" style="border-color:${atrasado?"#ef444455":"#2a2a2a"}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
           <div style="flex:1;min-width:0">
-            <div style="font-weight:600;font-size:15px;margin-bottom:3px">${d.nombre}${d.nDoc?` <span style="font-size:12px;color:#666">#${d.nDoc}</span>`:""}</div>
-            ${d.rut?`<div style="font-size:12px;color:#666">RUT: ${d.rut}${d.bultos?` · 📦 ${d.bultos} bulto${d.bultos>1?"s":""}`:""}</div>`:""}
-            <div style="font-size:12px;color:#666;margin-top:4px">${getResumen(d)}</div>
+            <div style="font-weight:700;font-size:15px;margin-bottom:2px">${d.nombre}</div>
+            <div style="font-size:12px;color:#666">${d.rut?"RUT: "+d.rut:""}${d.nDoc?" · N° "+d.nDoc:""}</div>
           </div>
-          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;margin-left:8px">
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;margin-left:8px">
             ${badge(d.estado)}
-            <span style="font-size:11px;color:${d.estado==="pendiente"&&d.fecha!==hoy?"#ef4444":"#555"}">${d.fecha}</span>
+            <span style="font-size:11px;color:${atrasado?"#ef4444":"#555"}">${d.fecha}</span>
           </div>
         </div>
-      </div>`).join("");
+        <div style="border-top:1px solid #2a2a2a;padding-top:8px;display:grid;grid-template-columns:1fr 1fr;gap:4px 12px">
+          <div style="font-size:12px;color:#888">🌏 ${d.tipoCompra==="importacion"?"Importación":"Compra nacional"}</div>
+          <div style="font-size:12px;color:#888">${destinoLabel}</div>
+          ${agenciaLabel?`<div style="font-size:12px;color:#888">🚚 ${agenciaLabel}</div>`:""}
+          ${empresaLabel?`<div style="font-size:12px;color:#888">🏭 ${empresaLabel}</div>`:""}
+          ${d.direccionDestino?`<div style="font-size:12px;color:#aaa;grid-column:1/-1">📍 ${d.direccionDestino}</div>`:""}
+          ${d.bultos?`<div style="font-size:12px;color:#888">📦 ${d.bultos} bulto${d.bultos>1?"s":""}</div>`:""}
+          ${d.notas?`<div style="font-size:12px;color:#666;grid-column:1/-1;font-style:italic">💬 ${d.notas}</div>`:""}
+        </div>
+      </div>`;
+    }).join("");
 
   return`
     <div class="header">
@@ -443,41 +460,72 @@ function renderDetalle(){
         </button>`).join("")}
       <div style="font-size:13px;color:#aaa;font-weight:600;margin:16px 0 10px">TICKET DE ENTREGA</div>
       ${d.ticketImg
-        ?`<img src="${d.ticketImg}" style="width:100%;border-radius:12px;margin-bottom:10px" />`
+        ?`<img src="${d.ticketImg}" style="width:100%;border-radius:12px;margin-bottom:10px" />
+           <a id="btnWhatsapp" href="#" style="display:flex;align-items:center;justify-content:center;gap:8px;background:#25D366;color:#fff;border-radius:10px;padding:12px;font-weight:700;font-size:14px;text-decoration:none;margin-bottom:10px">
+             <span style="font-size:18px">📲</span> Compartir por WhatsApp
+           </a>`
         :`<div style="color:#555;font-size:13px;margin-bottom:10px">No hay foto del ticket aún.</div>`}
-      <div class="upload-area" id="ticketUpload" style="margin-bottom:24px">
+      <div class="upload-area" id="ticketUpload" style="margin-bottom:8px">
         <div style="font-size:24px">📷</div>
         <div style="color:#888;font-size:13px;margin-top:4px">${d.ticketImg?"Cambiar foto del ticket":"Subir foto del ticket"}</div>
       </div>
+      <div style="text-align:center;font-size:12px;color:#555;margin-bottom:24px">o pega una imagen con <kbd style="background:#252525;border:1px solid #333;border-radius:4px;padding:1px 5px">Ctrl+V</kbd></div>
       <input type="file" id="ticketFileInput" accept="image/*" style="display:none" />
     </div>`;
 }
 function bindDetalle(){
+  const d=state.despachos.find(x=>x.id===state.selectedId);
   document.getElementById("btnBack").onclick=()=>setState({view:"lista"});
   document.getElementById("btnDelete").onclick=()=>{
-    const d=state.despachos.find(x=>x.id===state.selectedId);
     if(confirm("¿Eliminar este despacho?"))dbEliminar(state.selectedId,d?.fbKey);
   };
   document.querySelectorAll(".btn-estado").forEach(btn=>{
     btn.onclick=()=>dbEstado(state.selectedId,btn.dataset.fbkey,btn.dataset.estado);
   });
+
+  // WhatsApp
+  const btnWa=document.getElementById("btnWhatsapp");
+  if(btnWa&&d){
+    const agenciaLabel=d.agencia==="Otra..."?(d.agenciaCustom||"Otra"):d.agencia;
+    const texto=`📦 *Despacho Colderman*\n👤 ${d.nombre}${d.rut?" | RUT: "+d.rut:""}${d.nDoc?" | N°"+d.nDoc:""}\n🚚 ${agenciaLabel||""}${d.direccionDestino?" - "+d.direccionDestino:""}${d.bultos?" | "+d.bultos+" bulto(s)":""}\n📅 ${d.fecha}`;
+    btnWa.href="https://api.whatsapp.com/send?text="+encodeURIComponent(texto);
+    btnWa.target="_blank";
+  }
+
+  // Subir ticket por archivo
   document.getElementById("ticketUpload").onclick=()=>document.getElementById("ticketFileInput").click();
-  document.getElementById("ticketFileInput").onchange=e=>{
-    const file=e.target.files[0];
-    if(!file)return;
-    const reader=new FileReader();
-    reader.onload=ev=>{
-      const d=state.despachos.find(x=>x.id===state.selectedId);
-      if(!d)return;
-      if(state.useFirebase&&d.fbKey){
-        window._db.ref("despachos/"+d.fbKey).update({ticketImg:ev.target.result});
-      } else {
-        state.despachos=state.despachos.map(x=>x.id===d.id?{...x,ticketImg:ev.target.result}:x);
-        saveLocal();render();setTimeout(bindDetalle,0);
+  document.getElementById("ticketFileInput").onchange=e=>guardarTicket(e.target.files[0]);
+
+  // Pegar con Ctrl+V
+  const onPaste=e=>{
+    const items=e.clipboardData?.items;
+    if(!items)return;
+    for(const item of items){
+      if(item.type.startsWith("image/")){
+        guardarTicket(item.getAsFile());
+        break;
       }
-    };
-    reader.readAsDataURL(file);
+    }
   };
+  document.addEventListener("paste",onPaste);
+  // Limpiar listener al salir
+  window._pasteCleanup=()=>document.removeEventListener("paste",onPaste);
+}
+
+function guardarTicket(file){
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    const d=state.despachos.find(x=>x.id===state.selectedId);
+    if(!d)return;
+    if(state.useFirebase&&d.fbKey){
+      window._db.ref("despachos/"+d.fbKey).update({ticketImg:ev.target.result});
+    } else {
+      state.despachos=state.despachos.map(x=>x.id===d.id?{...x,ticketImg:ev.target.result}:x);
+      saveLocal();render();setTimeout(bindDetalle,0);
+    }
+  };
+  reader.readAsDataURL(file);
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
