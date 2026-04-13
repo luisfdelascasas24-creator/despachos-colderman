@@ -9,12 +9,9 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="Despachos" />
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getDatabase, ref, push, set, onValue, update, remove }
-      from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
-
-    // ── REEMPLAZA CON TU CONFIGURACIÓN DE FIREBASE ──
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script>
     const firebaseConfig = {
       apiKey: "AIzaSyAaXhbTngCzxcXdo3i-mfwy_kG2ehNS4sc",
       authDomain: "despachos-colderman.firebaseapp.com",
@@ -24,16 +21,8 @@
       messagingSenderId: "665527276782",
       appId: "1:665527276782:web:60503cd5580d8a78078fff"
     };
-
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
-    window._db = db;
-    window._dbRef = ref;
-    window._dbPush = push;
-    window._dbSet = set;
-    window._dbOnValue = onValue;
-    window._dbUpdate = update;
-    window._dbRemove = remove;
+    firebase.initializeApp(firebaseConfig);
+    window._db = firebase.database();
     window._firebaseReady = true;
     window.dispatchEvent(new Event("firebaseReady"));
   </script>
@@ -110,11 +99,9 @@ let state = {
 
 // ── STORAGE ───────────────────────────────────────────────────────────────────
 function initStorage() {
-  const configured = window._firebaseReady && !document.querySelector('script[type="module"]').textContent.includes('"TU_API_KEY"');
-  if (configured) {
+  if (window._firebaseReady && window._db) {
     state.useFirebase = true;
-    const r = window._dbRef(window._db, "despachos");
-    window._dbOnValue(r, snap => {
+    window._db.ref("despachos").on("value", snap => {
       const val = snap.val();
       state.despachos = val ? Object.entries(val).map(([k,v])=>({...v,fbKey:k})) : [];
       state.despachos.sort((a,b)=>(b.ts||0)-(a.ts||0));
@@ -133,18 +120,17 @@ function saveLocal() {
 
 async function dbGuardar(d) {
   if (state.useFirebase) {
-    const r = window._dbPush(window._dbRef(window._db,"despachos"));
-    await window._dbSet(r, d);
+    window._db.ref("despachos").push(d);
   } else { state.despachos=[d,...state.despachos]; saveLocal(); render(); }
 }
 async function dbEstado(id, fbKey, estado) {
   if (state.useFirebase && fbKey) {
-    await window._dbUpdate(window._dbRef(window._db,"despachos/"+fbKey),{estado});
+    window._db.ref("despachos/"+fbKey).update({estado});
   } else { state.despachos=state.despachos.map(d=>d.id===id?{...d,estado}:d); saveLocal(); render(); }
 }
 async function dbEliminar(id, fbKey) {
   if (state.useFirebase && fbKey) {
-    await window._dbRemove(window._dbRef(window._db,"despachos/"+fbKey));
+    window._db.ref("despachos/"+fbKey).remove();
   } else { state.despachos=state.despachos.filter(d=>d.id!==id); saveLocal(); }
   setState({view:"lista",selectedId:null});
 }
