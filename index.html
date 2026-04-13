@@ -144,11 +144,12 @@ async function handleFile(file){
       const worker=await createWorker("spa");
       const {data:{text}}=await worker.recognize(file);
       await worker.terminate();
-      // Extraer RUT (formato XX.XXX.XXX-X o XXXXXXXX-X)
-      const rutMatch=text.match(/\b(\d{1,2}\.?\d{3}\.?\d{3}-[\dkK])\b/);
-      // Extraer nombre — busca después de "SEÑORES:" o "Cliente:" o primera línea con mayúsculas
-      const nombreMatch=text.match(/(?:SE[ÑN]ORES?|CLIENTE|RAZON SOCIAL|EMPRESA)[:\s]+([A-ZÁÉÍÓÚÑ][^\n]{3,50})/i)
-        ||text.match(/^([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s]{5,40})$/m);
+      // Extraer nombre — busca SEÑOR(ES): o CLIENTE: primero (es el destinatario, no el emisor)
+      const nombreMatch=text.match(/SE[ÑN]OR(?:ES)?[:\s]+([^\n]{3,60})/i)
+        ||text.match(/(?:CLIENTE|A NOMBRE DE|RAZON SOCIAL|DESTINATARIO)[:\s]+([^\n]{3,60})/i);
+      // Extraer RUT — busca la línea que dice RUT: seguida del número
+      const rutMatch=text.match(/\bRUT[:\s]+(\d{1,2}\.?\d{3}\.?\d{3}-[\dkK])/i)
+        ||text.match(/\b(\d{1,2}\.\d{3}\.\d{3}-[\dkK])\b/);
       state.form.nombre=nombreMatch?nombreMatch[1].trim():"";
       state.form.rut=rutMatch?rutMatch[1]:"";
       state.form.extracting=false;
