@@ -86,7 +86,7 @@ const emptyForm=()=>({
   imgPreview:null,extracting:false,extractError:""
 });
 
-let state={despachos:[],view:"lista",selectedId:null,filtro:"todos",form:emptyForm(),useFirebase:false};
+let state={despachos:[],view:"lista",selectedId:null,filtro:"todos",busqueda:"",form:emptyForm(),useFirebase:false};
 
 // ── FIREBASE ──────────────────────────────────────────────────────────────────
 function initStorage(){
@@ -218,7 +218,15 @@ function render(){
 // ── LISTA ─────────────────────────────────────────────────────────────────────
 function renderLista(){
   const c=counts();
-  const filtrados=state.filtro==="todos"?state.despachos:state.despachos.filter(d=>d.estado===state.filtro);
+  const filtrados = (() => {
+    let arr = state.filtro==="todos" ? state.despachos : state.despachos.filter(d=>d.estado===state.filtro);
+    if (state.busqueda.trim()) {
+      const q = state.busqueda.toLowerCase().trim();
+      arr = arr.filter(d => [d.nombre,d.rut,d.agencia,d.agenciaCustom,d.direccionDestino,d.empresaNacional,d.empresaNacionalCustom,d.notas]
+        .some(v => v && v.toLowerCase().includes(q)));
+    }
+    return arr;
+  })();
   const cards=filtrados.length===0
     ?`<div class="empty">${state.despachos.length===0?"No hay despachos. Agrega el primero.":"Sin resultados."}</div>`
     :filtrados.map(d=>`
@@ -250,12 +258,20 @@ function renderLista(){
           <div class="lbl">${v.label}</div>
         </div>`).join("")}
     </div>
+    <div style="padding:10px 16px 0;max-width:600px;margin:0 auto">
+      <div style="position:relative">
+        <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#555;font-size:16px">🔍</span>
+        <input id="searchInput" value="${state.busqueda||""}" placeholder="Buscar por nombre, RUT, agencia, destino..." 
+          style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:10px;padding:10px 12px 10px 36px;color:#fff;font-size:14px;outline:none" />
+      </div>
+    </div>
     <div class="page">${cards}</div>`;
 }
 function bindLista(){
   document.getElementById("btnNuevo").onclick=()=>setState({view:"nuevo",form:emptyForm()});
   Object.keys(ESTADOS).forEach(k=>{document.getElementById("cnt-"+k).onclick=()=>setState({filtro:state.filtro===k?"todos":k});});
   document.querySelectorAll(".card[data-id]").forEach(el=>{el.onclick=()=>setState({view:"detalle",selectedId:+el.dataset.id});});
+  document.getElementById("searchInput").oninput=e=>{state.busqueda=e.target.value;render();setTimeout(bindLista,0);};
 }
 
 // ── NUEVO ─────────────────────────────────────────────────────────────────────
@@ -399,6 +415,15 @@ function renderDetalle(){
           style="color:${v.color};border-color:${d.estado===k?v.color:"#333"};background:${d.estado===k?v.bg:"#1a1a1a"}">
           ${d.estado===k?"✓ ":""}${v.label}
         </button>`).join("")}
+      <div style="font-size:13px;color:#aaa;font-weight:600;margin:16px 0 10px">TICKET DE ENTREGA</div>
+      ${d.ticketImg
+        ?`<img src="${d.ticketImg}" style="width:100%;border-radius:12px;margin-bottom:10px" />`
+        :`<div style="color:#555;font-size:13px;margin-bottom:10px">No hay foto del ticket aún.</div>`}
+      <div class="upload-area" id="ticketUpload" style="margin-bottom:24px">
+        <div style="font-size:24px">📷</div>
+        <div style="color:#888;font-size:13px;margin-top:4px">${d.ticketImg?"Cambiar foto del ticket":"Subir foto del ticket"}</div>
+      </div>
+      <input type="file" id="ticketFileInput" accept="image/*" style="display:none" />
     </div>`;
 }
 function bindDetalle(){
@@ -410,6 +435,23 @@ function bindDetalle(){
   document.querySelectorAll(".btn-estado").forEach(btn=>{
     btn.onclick=()=>dbEstado(state.selectedId,btn.dataset.fbkey,btn.dataset.estado);
   });
+  document.getElementById("ticketUpload").onclick=()=>document.getElementById("ticketFileInput").click();
+  document.getElementById("ticketFileInput").onchange=e=>{
+    const file=e.target.files[0];
+    if(!file)return;
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      const d=state.despachos.find(x=>x.id===state.selectedId);
+      if(!d)return;
+      if(state.useFirebase&&d.fbKey){
+        window._db.ref("despachos/"+d.fbKey).update({ticketImg:ev.target.result});
+      } else {
+        state.despachos=state.despachos.map(x=>x.id===d.id?{...x,ticketImg:ev.target.result}:x);
+        saveLocal();render();setTimeout(bindDetalle,0);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
