@@ -1,101 +1,90 @@
 <!DOCTYPE html>
-
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
   <title>Despachos Colderman</title>
-
-  <!-- PWA -->
   <meta name="theme-color" content="#e07b00" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Despachos" />
-  <link rel="manifest" href="manifest.json" />
-  <script>
-    const manifest = {
-      name: "Despachos Colderman",
-      short_name: "Despachos",
-      description: "Gestor de despachos para Colderman",
-      start_url: "/despachos-colderman/",
-      display: "standalone",
-      background_color: "#0f0f0f",
-      theme_color: "#e07b00",
-      icons: [
-        { src: "icon.png", sizes: "192x192", type: "image/png" },
-        { src: "icon.png", sizes: "512x512", type: "image/png" }
-      ]
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getDatabase, ref, push, set, onValue, update, remove }
+      from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+    // ── REEMPLAZA CON TU CONFIGURACIÓN DE FIREBASE ──
+    const firebaseConfig = {
+      apiKey: "AIzaSyAaXhbTngCzxcXdo3i-mfwy_kG2ehNS4sc",
+      authDomain: "despachos-colderman.firebaseapp.com",
+      databaseURL: "https://despachos-colderman-default-rtdb.firebaseio.com",
+      projectId: "despachos-colderman",
+      storageBucket: "despachos-colderman.firebasestorage.app",
+      messagingSenderId: "665527276782",
+      appId: "1:665527276782:web:60503cd5580d8a78078fff"
     };
-    const blob = new Blob([JSON.stringify(manifest)], {type: "application/json"});
-    document.querySelector('link[rel="manifest"]').href = URL.createObjectURL(blob);
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    window._db = db;
+    window._dbRef = ref;
+    window._dbPush = push;
+    window._dbSet = set;
+    window._dbOnValue = onValue;
+    window._dbUpdate = update;
+    window._dbRemove = remove;
+    window._firebaseReady = true;
+    window.dispatchEvent(new Event("firebaseReady"));
   </script>
 
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Inter, sans-serif; background: #0f0f0f; color: #f1f1f1; min-height: 100vh; }
     input, select, textarea, button { font-family: inherit; }
-
-    /* Header */
     .header { background: #1a1a1a; border-bottom: 1px solid #2a2a2a; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10; }
-    .header-title { font-weight: 700; font-size: 17px; }
-    .header-sub { font-size: 12px; color: #666; margin-top: 2px; }
-
-    /* Buttons */
     .btn-primary { background: linear-gradient(135deg, #e07b00, #f59e0b); color: #fff; border: none; border-radius: 10px; padding: 11px 18px; font-weight: 700; font-size: 14px; cursor: pointer; }
     .btn-back { background: none; border: none; color: #aaa; font-size: 22px; cursor: pointer; padding: 4px 8px; }
     .btn-delete { background: none; border: none; color: #ef4444; font-size: 20px; cursor: pointer; }
-    .btn-estado { width: 100%; border-radius: 10px; padding: 13px 16px; font-size: 15px; font-weight: 600; cursor: pointer; text-align: left; margin-bottom: 10px; border: 1px solid #333; }
-
-    /* Inputs */
+    .btn-estado { width: 100%; border-radius: 10px; padding: 13px 16px; font-size: 15px; font-weight: 600; cursor: pointer; text-align: left; margin-bottom: 10px; }
     .field { margin-bottom: 14px; }
     .field label { font-size: 12px; color: #888; display: block; margin-bottom: 5px; }
-    .field input, .field select, .field textarea {
-      width: 100%; background: #252525; border: 1px solid #333; border-radius: 10px;
-      padding: 11px 12px; color: #fff; font-size: 15px; outline: none;
-    }
+    .field input, .field select, .field textarea { width: 100%; background: #252525; border: 1px solid #333; border-radius: 10px; padding: 11px 12px; color: #fff; font-size: 15px; outline: none; }
     .field textarea { resize: none; }
-
-    /* Upload */
-    .upload-area { border: 2px dashed #333; border-radius: 14px; padding: 24px; text-align: center; cursor: pointer; background: #1a1a1a; margin-bottom: 14px; }
-    .upload-area img { max-height: 160px; border-radius: 8px; max-width: 100%; }
-
-    /* Cards */
+    .field input::placeholder { color: #555; }
     .card { background: #1a1a1a; border-radius: 14px; padding: 16px; cursor: pointer; border: 1px solid #2a2a2a; margin-bottom: 10px; }
-
-    /* Counters */
+    .card:active { opacity: 0.8; }
     .counters { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; padding: 14px 16px 0; }
     .counter { border-radius: 12px; padding: 10px 8px; text-align: center; cursor: pointer; border: 1px solid #2a2a2a; background: #1a1a1a; }
     .counter .num { font-size: 22px; font-weight: 700; }
     .counter .lbl { font-size: 10px; color: #888; margin-top: 2px; }
-
-    /* Badge */
     .badge { border-radius: 20px; padding: 3px 10px; font-size: 12px; font-weight: 600; border: 1px solid; white-space: nowrap; }
-
-    /* Page */
     .page { max-width: 600px; margin: 0 auto; padding: 16px; }
-
-    /* Detail rows */
     .row { display: flex; gap: 8px; margin-bottom: 8px; }
-    .row .lbl { font-size: 13px; color: #666; min-width: 74px; }
+    .row .lbl { font-size: 13px; color: #666; min-width: 80px; flex-shrink: 0; }
     .row .val { font-size: 13px; color: #ddd; }
-
     .empty { text-align: center; color: #555; padding: 50px 0; font-size: 15px; }
-    .error-msg { color: #ef4444; font-size: 13px; margin-top: 6px; }
-    .extracting { color: #f59e0b; text-align: center; margin: 8px 0; font-size: 14px; }
+    .loading { text-align: center; color: #888; padding: 40px 0; }
+    .tipo-tabs { display: flex; gap: 10px; margin-bottom: 16px; }
+    .tipo-tab { flex: 1; padding: 10px; border-radius: 10px; border: 1px solid #333; background: #1a1a1a; color: #888; font-size: 14px; font-weight: 600; cursor: pointer; text-align: center; }
+    .tipo-tab.active { border-color: #e07b00; color: #e07b00; background: #2a1f00; }
+    .section-title { font-size: 11px; color: #666; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; margin-top: 4px; }
+    #banner { background: #2a1f00; border: 1px solid #e07b00; border-radius: 12px; padding: 12px 16px; margin: 12px 16px; font-size: 13px; color: #f59e0b; display: none; }
   </style>
 </head>
 <body>
-
-<div id="app"></div>
+<div id="banner">⚠️ Firebase no configurado — datos guardados solo localmente.</div>
+<div id="app"><div class="loading">Cargando...</div></div>
 
 <script>
-// ── DATA ──────────────────────────────────────────────────────────────────────
-const REGIONES = ["Arica y Parinacota","Tarapacá","Antofagasta","Atacama","Coquimbo",
-  "Valparaíso","Metropolitana","O'Higgins","Maule","Ñuble","Biobío",
-  "La Araucanía","Los Ríos","Los Lagos","Aysén","Magallanes"];
+const REGIONES = [
+  "Arica y Parinacota","Tarapacá","Antofagasta","Atacama","Coquimbo",
+  "Valparaíso","Región Metropolitana","O'Higgins","Maule","Ñuble","Biobío",
+  "La Araucanía","Los Ríos","Los Lagos","Aysén","Magallanes"
+];
 
-const AGENCIAS = ["Starken","Chilexpress","FedEx","Varmon","Blue Express","Correos Chile","Otra"];
+const AGENCIAS_ENVIO = ["Starken","Varmont","PDQ","Chevallier","FedEx","Chilexpress","RapidCargo","Uber Envíos","Infante","Otra..."];
+const EMPRESAS_RETIRO = ["Blescom","Esmeralda","American Air","Otra..."];
 
 const ESTADOS = {
   pendiente:  { label: "Pendiente",        color: "#f59e0b", bg: "#2a1f00" },
@@ -103,139 +92,115 @@ const ESTADOS = {
   falta_doc:  { label: "Falta documento",  color: "#ef4444", bg: "#2a0000" },
 };
 
-// ── STORAGE ───────────────────────────────────────────────────────────────────
-function loadDespachos() {
-  try { return JSON.parse(localStorage.getItem("despachos_colderman") || "[]"); } catch { return []; }
-}
-function saveDespachos(arr) {
-  // Guardamos sin imágenes para no saturar localStorage (imagen solo en sesión)
-  const clean = arr.map(d => ({ ...d, imagen: null }));
-  localStorage.setItem("despachos_colderman", JSON.stringify(clean));
-}
+const emptyForm = () => ({
+  nombre:"", rut:"", tipo:"envio",
+  agencia:"", agenciaCustom:"",
+  empresa:"", empresaCustom:"",
+  destino:"", region:"", notas:""
+});
 
-// ── STATE ─────────────────────────────────────────────────────────────────────
 let state = {
-  despachos: loadDespachos(),
-  view: "lista",        // lista | nuevo | detalle
+  despachos: [],
+  view: "lista",
   selectedId: null,
   filtro: "todos",
-  form: { nombre:"", rut:"", destino:"", region:"", agencia:"", notas:"" },
-  imgPreview: null,
-  extracting: false,
-  extractError: "",
-  nextId: Date.now(),
+  form: emptyForm(),
+  useFirebase: false,
 };
 
-function setState(patch) {
-  Object.assign(state, patch);
-  render();
+// ── STORAGE ───────────────────────────────────────────────────────────────────
+function initStorage() {
+  const configured = window._firebaseReady && !document.querySelector('script[type="module"]').textContent.includes('"TU_API_KEY"');
+  if (configured) {
+    state.useFirebase = true;
+    const r = window._dbRef(window._db, "despachos");
+    window._dbOnValue(r, snap => {
+      const val = snap.val();
+      state.despachos = val ? Object.entries(val).map(([k,v])=>({...v,fbKey:k})) : [];
+      state.despachos.sort((a,b)=>(b.ts||0)-(a.ts||0));
+      render();
+    });
+  } else {
+    document.getElementById("banner").style.display = "block";
+    try { state.despachos = JSON.parse(localStorage.getItem("dcold")||"[]"); } catch { state.despachos=[]; }
+    render();
+  }
+}
+
+function saveLocal() {
+  localStorage.setItem("dcold", JSON.stringify(state.despachos));
+}
+
+async function dbGuardar(d) {
+  if (state.useFirebase) {
+    const r = window._dbPush(window._dbRef(window._db,"despachos"));
+    await window._dbSet(r, d);
+  } else { state.despachos=[d,...state.despachos]; saveLocal(); render(); }
+}
+async function dbEstado(id, fbKey, estado) {
+  if (state.useFirebase && fbKey) {
+    await window._dbUpdate(window._dbRef(window._db,"despachos/"+fbKey),{estado});
+  } else { state.despachos=state.despachos.map(d=>d.id===id?{...d,estado}:d); saveLocal(); render(); }
+}
+async function dbEliminar(id, fbKey) {
+  if (state.useFirebase && fbKey) {
+    await window._dbRemove(window._dbRef(window._db,"despachos/"+fbKey));
+  } else { state.despachos=state.despachos.filter(d=>d.id!==id); saveLocal(); }
+  setState({view:"lista",selectedId:null});
 }
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
-function badge(estado) {
-  const e = ESTADOS[estado];
-  return `<span class="badge" style="color:${e.color};border-color:${e.color};background:${e.bg}">${e.label}</span>`;
+function setState(p){Object.assign(state,p);render();}
+function badge(e){const v=ESTADOS[e];return `<span class="badge" style="color:${v.color};border-color:${v.color};background:${v.bg}">${v.label}</span>`;}
+function counts(){return{pendiente:state.despachos.filter(d=>d.estado==="pendiente").length,entregado:state.despachos.filter(d=>d.estado==="entregado").length,falta_doc:state.despachos.filter(d=>d.estado==="falta_doc").length};}
+function getEmpresaLabel(d){
+  if(d.tipo==="retiro") return d.empresa==="Otra..."?(d.empresaCustom||"Otra"):d.empresa;
+  return d.agencia==="Otra..."?(d.agenciaCustom||"Otra"):d.agencia;
 }
 
-function counts() {
-  return {
-    pendiente: state.despachos.filter(d => d.estado === "pendiente").length,
-    entregado: state.despachos.filter(d => d.estado === "entregado").length,
-    falta_doc: state.despachos.filter(d => d.estado === "falta_doc").length,
-  };
-}
-
-// ── ACTIONS ───────────────────────────────────────────────────────────────────
-async function handleFile(file) {
-  if (!file) return;
-  setState({ extractError: "", extracting: true });
-  const reader = new FileReader();
-  reader.onload = async (e) => {
-    const base64 = e.target.result.split(",")[1];
-    const mediaType = file.type || "image/jpeg";
-    state.imgPreview = e.target.result;
-    render();
-    try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "anthropic-dangerous-direct-browser-access": "true" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 500,
-          messages: [{
-            role: "user",
-            content: [
-              { type: "image", source: { type: "base64", media_type: mediaType, data: base64 } },
-              { type: "text", text: `Extrae del documento el nombre del cliente o empresa y el RUT si aparece. Responde SOLO en JSON sin backticks:\n{"nombre":"...","rut":"..."}\nSi no encuentras algún dato deja el campo vacío.` }
-            ]
-          }]
-        })
-      });
-      const data = await res.json();
-      const text = (data.content || []).map(b => b.text || "").join("");
-      const parsed = JSON.parse(text.replace(/```json|```/g, "").trim());
-      state.form.nombre = parsed.nombre || "";
-      state.form.rut    = parsed.rut    || "";
-      setState({ extracting: false });
-    } catch {
-      setState({ extracting: false, extractError: "No se pudo extraer. Rellena manualmente." });
-    }
-  };
-  reader.readAsDataURL(file);
-}
-
-function guardar() {
-  if (!state.form.nombre.trim()) return;
-  const nuevo = {
-    id: state.nextId++,
-    ...state.form,
-    estado: "pendiente",
-    fecha: new Date().toLocaleDateString("es-CL"),
-    imagen: state.imgPreview,
-  };
-  state.despachos = [nuevo, ...state.despachos];
-  saveDespachos(state.despachos);
-  setState({ view: "lista", form: { nombre:"",rut:"",destino:"",region:"",agencia:"",notas:"" }, imgPreview: null });
-}
-
-function cambiarEstado(id, estado) {
-  state.despachos = state.despachos.map(d => d.id === id ? { ...d, estado } : d);
-  saveDespachos(state.despachos);
-  render();
-}
-
-function eliminar(id) {
-  state.despachos = state.despachos.filter(d => d.id !== id);
-  saveDespachos(state.despachos);
-  setState({ view: "lista", selectedId: null });
+// ── GUARDAR ───────────────────────────────────────────────────────────────────
+function guardar(){
+  if(!state.form.nombre.trim()) return;
+  const f=state.form;
+  dbGuardar({
+    id:Date.now(), ts:Date.now(),
+    nombre:f.nombre.trim(), rut:f.rut.trim(),
+    tipo:f.tipo,
+    agencia:f.agencia, agenciaCustom:f.agenciaCustom.trim(),
+    empresa:f.empresa, empresaCustom:f.empresaCustom.trim(),
+    destino:f.destino.trim(), region:f.region,
+    notas:f.notas.trim(),
+    estado:"pendiente",
+    fecha:new Date().toLocaleDateString("es-CL"),
+  });
+  setState({view:"lista",form:emptyForm()});
 }
 
 // ── RENDER ────────────────────────────────────────────────────────────────────
-function render() {
-  const app = document.getElementById("app");
-  if (state.view === "nuevo")    { app.innerHTML = renderNuevo(); bindNuevo(); return; }
-  if (state.view === "detalle")  { app.innerHTML = renderDetalle(); bindDetalle(); return; }
-  app.innerHTML = renderLista(); bindLista();
+function render(){
+  const app=document.getElementById("app");
+  if(state.view==="nuevo"){app.innerHTML=renderNuevo();bindNuevo();return;}
+  if(state.view==="detalle"){app.innerHTML=renderDetalle();bindDetalle();return;}
+  app.innerHTML=renderLista();bindLista();
 }
 
-// ── VISTA: LISTA ──────────────────────────────────────────────────────────────
-function renderLista() {
-  const c = counts();
-  const filtrados = state.filtro === "todos"
-    ? state.despachos
-    : state.despachos.filter(d => d.estado === state.filtro);
-
-  const cards = filtrados.length === 0
-    ? `<div class="empty">${state.despachos.length === 0 ? "No hay despachos. Agrega el primero." : "Sin resultados."}</div>`
-    : filtrados.map(d => `
+// ── LISTA ─────────────────────────────────────────────────────────────────────
+function renderLista(){
+  const c=counts();
+  const filtrados=state.filtro==="todos"?state.despachos:state.despachos.filter(d=>d.estado===state.filtro);
+  const cards=filtrados.length===0
+    ?`<div class="empty">${state.despachos.length===0?"No hay despachos aún.":"Sin resultados para este filtro."}</div>`
+    :filtrados.map(d=>`
       <div class="card" data-id="${d.id}">
         <div style="display:flex;justify-content:space-between;align-items:flex-start">
-          <div style="flex:1">
+          <div style="flex:1;min-width:0">
             <div style="font-weight:600;font-size:15px;margin-bottom:3px">${d.nombre}</div>
-            ${d.rut ? `<div style="font-size:12px;color:#666">RUT: ${d.rut}</div>` : ""}
-            <div style="font-size:12px;color:#666;margin-top:4px">${[d.agencia, d.region].filter(Boolean).join(" · ")}</div>
+            ${d.rut?`<div style="font-size:12px;color:#666">RUT: ${d.rut}</div>`:""}
+            <div style="font-size:12px;color:#666;margin-top:4px">
+              ${d.tipo==="retiro"?"🏭 Retiro":"📦 Envío"} · ${[getEmpresaLabel(d),d.region].filter(Boolean).join(" · ")}
+            </div>
           </div>
-          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;margin-left:8px">
             ${badge(d.estado)}
             <span style="font-size:11px;color:#555">${d.fecha}</span>
           </div>
@@ -245,34 +210,36 @@ function renderLista() {
   return `
     <div class="header">
       <div>
-        <div class="header-title">📦 Despachos Colderman</div>
-        <div class="header-sub">${state.despachos.length} total</div>
+        <div style="font-weight:700;font-size:17px">📦 Despachos Colderman</div>
+        <div style="font-size:12px;color:#666">${state.despachos.length} total · ${state.useFirebase?"🔄 sincronizado":"local"}</div>
       </div>
       <button class="btn-primary" id="btnNuevo">+ Nuevo</button>
     </div>
     <div class="counters">
-      ${Object.entries(ESTADOS).map(([k,v]) => `
-        <div class="counter" id="cnt-${k}" style="border-color:${state.filtro===k?v.color:'#2a2a2a'};background:${state.filtro===k?v.bg:'#1a1a1a'}">
+      ${Object.entries(ESTADOS).map(([k,v])=>`
+        <div class="counter" id="cnt-${k}" style="border-color:${state.filtro===k?v.color:"#2a2a2a"};background:${state.filtro===k?v.bg:"#1a1a1a"}">
           <div class="num" style="color:${v.color}">${c[k]}</div>
           <div class="lbl">${v.label}</div>
         </div>`).join("")}
     </div>
     <div class="page">${cards}</div>`;
 }
-
-function bindLista() {
-  document.getElementById("btnNuevo").onclick = () => setState({ view: "nuevo" });
-  Object.keys(ESTADOS).forEach(k => {
-    document.getElementById("cnt-" + k).onclick = () =>
-      setState({ filtro: state.filtro === k ? "todos" : k });
+function bindLista(){
+  document.getElementById("btnNuevo").onclick=()=>setState({view:"nuevo"});
+  Object.keys(ESTADOS).forEach(k=>{
+    document.getElementById("cnt-"+k).onclick=()=>setState({filtro:state.filtro===k?"todos":k});
   });
-  document.querySelectorAll(".card[data-id]").forEach(el => {
-    el.onclick = () => setState({ view: "detalle", selectedId: +el.dataset.id });
+  document.querySelectorAll(".card[data-id]").forEach(el=>{
+    el.onclick=()=>setState({view:"detalle",selectedId:+el.dataset.id});
   });
 }
 
-// ── VISTA: NUEVO ──────────────────────────────────────────────────────────────
-function renderNuevo() {
+// ── NUEVO ─────────────────────────────────────────────────────────────────────
+function renderNuevo(){
+  const f=state.form;
+  const isEnvio=f.tipo==="envio";
+  const showAgenciaCustom=isEnvio&&f.agencia==="Otra...";
+  const showEmpresaCustom=!isEnvio&&f.empresa==="Otra...";
   return `
     <div class="header">
       <button class="btn-back" id="btnBack">←</button>
@@ -280,69 +247,77 @@ function renderNuevo() {
       <div style="width:40px"></div>
     </div>
     <div class="page">
-      <div class="upload-area" id="uploadArea">
-        ${state.imgPreview
-          ? `<img src="${state.imgPreview}" alt="preview" />`
-          : `<div style="font-size:32px">📎</div><div style="color:#888;font-size:14px;margin-top:8px">Toca para subir captura de factura / cotización</div>`}
-      </div>
-      <input type="file" id="fileInput" accept="image/*" style="display:none" />
-      ${state.extracting ? `<p class="extracting">⏳ Extrayendo datos...</p>` : ""}
-      ${state.extractError ? `<p class="error-msg">${state.extractError}</p>` : ""}
+      <div class="field"><label>Nombre del cliente / empresa *</label>
+        <input id="fNombre" value="${f.nombre}" placeholder="Ej: Transportes Pérez SpA" /></div>
+      <div class="field"><label>RUT</label>
+        <input id="fRut" value="${f.rut}" placeholder="Ej: 12.345.678-9" /></div>
 
-      <div class="field">
-        <label>Nombre del cliente / empresa *</label>
-        <input id="fNombre" value="${state.form.nombre}" placeholder="Extraído o escribe aquí" />
+      <div class="section-title">Tipo de movimiento</div>
+      <div class="tipo-tabs" style="margin-bottom:16px">
+        <div class="tipo-tab ${isEnvio?"active":""}" id="tabEnvio">📦 Envío a provincia</div>
+        <div class="tipo-tab ${!isEnvio?"active":""}" id="tabRetiro">🏭 Retiro nacional</div>
       </div>
-      <div class="field">
-        <label>RUT</label>
-        <input id="fRut" value="${state.form.rut}" placeholder="Ej: 12.345.678-9" />
-      </div>
-      <div class="field">
-        <label>Agencia de envío</label>
-        <select id="fAgencia">
-          <option value="">Seleccionar agencia...</option>
-          ${AGENCIAS.map(a => `<option ${state.form.agencia===a?"selected":""}>${a}</option>`).join("")}
-        </select>
-      </div>
-      <div class="field">
-        <label>Destino (sucursal o dirección exacta)</label>
-        <input id="fDestino" value="${state.form.destino}" placeholder="Ej: Sucursal Starken Talca" />
-      </div>
-      <div class="field">
-        <label>Región de destino</label>
-        <select id="fRegion">
-          <option value="">Seleccionar región...</option>
-          ${REGIONES.map(r => `<option ${state.form.region===r?"selected":""}>${r}</option>`).join("")}
-        </select>
-      </div>
-      <div class="field">
-        <label>Notas adicionales</label>
-        <textarea id="fNotas" rows="2" placeholder="Observaciones...">${state.form.notas}</textarea>
-      </div>
+
+      ${isEnvio?`
+        <div class="field"><label>Agencia de envío</label>
+          <select id="fAgencia">
+            <option value="">Seleccionar agencia...</option>
+            ${AGENCIAS_ENVIO.map(a=>`<option ${f.agencia===a?"selected":""}>${a}</option>`).join("")}
+          </select></div>
+        ${showAgenciaCustom?`<div class="field"><label>¿Cuál agencia?</label>
+          <input id="fAgenciaCustom" value="${f.agenciaCustom}" placeholder="Nombre de la agencia" /></div>`:""}
+        <div class="field"><label>Destino (sucursal o dirección)</label>
+          <input id="fDestino" value="${f.destino}" placeholder="Ej: Sucursal Starken Talca" /></div>
+        <div class="field"><label>Región de destino</label>
+          <select id="fRegion">
+            <option value="">Seleccionar región...</option>
+            ${REGIONES.map(r=>`<option ${f.region===r?"selected":""}>${r}</option>`).join("")}
+          </select></div>
+      `:`
+        <div class="field"><label>Empresa de retiro</label>
+          <select id="fEmpresa">
+            <option value="">Seleccionar empresa...</option>
+            ${EMPRESAS_RETIRO.map(e=>`<option ${f.empresa===e?"selected":""}>${e}</option>`).join("")}
+          </select></div>
+        ${showEmpresaCustom?`<div class="field"><label>¿Cuál empresa?</label>
+          <input id="fEmpresaCustom" value="${f.empresaCustom}" placeholder="Nombre de la empresa" /></div>`:""}
+        <div class="field"><label>Dirección de retiro</label>
+          <input id="fDestino" value="${f.destino}" placeholder="Ej: Av. Américo Vespucio 123, Quilicura" /></div>
+      `}
+
+      <div class="field"><label>Notas adicionales</label>
+        <textarea id="fNotas" rows="2" placeholder="Observaciones...">${f.notas}</textarea></div>
       <button class="btn-primary" id="btnGuardar" style="width:100%;padding:14px;font-size:16px">Guardar despacho</button>
     </div>`;
 }
-
-function bindNuevo() {
-  document.getElementById("btnBack").onclick = () =>
-    setState({ view: "lista", imgPreview: null, form: { nombre:"",rut:"",destino:"",region:"",agencia:"",notas:"" } });
-
-  document.getElementById("uploadArea").onclick = () => document.getElementById("fileInput").click();
-  document.getElementById("fileInput").onchange = e => handleFile(e.target.files[0]);
-
-  ["fNombre","fRut","fDestino","fNotas"].forEach(id => {
-    document.getElementById(id).oninput = e => { state.form[id.replace("f","").toLowerCase()] = e.target.value; };
-  });
-  document.getElementById("fAgencia").onchange = e => { state.form.agencia = e.target.value; };
-  document.getElementById("fRegion").onchange  = e => { state.form.region  = e.target.value; };
-
-  document.getElementById("btnGuardar").onclick = guardar;
+function bindNuevo(){
+  const rerender=()=>{const v=state.view;state.view="nuevo";render();};
+  document.getElementById("btnBack").onclick=()=>setState({view:"lista",form:emptyForm()});
+  document.getElementById("fNombre").oninput=e=>{state.form.nombre=e.target.value;};
+  document.getElementById("fRut").oninput=e=>{state.form.rut=e.target.value;};
+  document.getElementById("fNotas").oninput=e=>{state.form.notas=e.target.value;};
+  document.getElementById("tabEnvio").onclick=()=>{state.form.tipo="envio";render();setTimeout(bindNuevo,0);};
+  document.getElementById("tabRetiro").onclick=()=>{state.form.tipo="retiro";render();setTimeout(bindNuevo,0);};
+  const fa=document.getElementById("fAgencia");
+  if(fa) fa.onchange=e=>{state.form.agencia=e.target.value;render();setTimeout(bindNuevo,0);};
+  const fac=document.getElementById("fAgenciaCustom");
+  if(fac) fac.oninput=e=>{state.form.agenciaCustom=e.target.value;};
+  const fe=document.getElementById("fEmpresa");
+  if(fe) fe.onchange=e=>{state.form.empresa=e.target.value;render();setTimeout(bindNuevo,0);};
+  const fec=document.getElementById("fEmpresaCustom");
+  if(fec) fec.oninput=e=>{state.form.empresaCustom=e.target.value;};
+  const fd=document.getElementById("fDestino");
+  if(fd) fd.oninput=e=>{state.form.destino=e.target.value;};
+  const fr=document.getElementById("fRegion");
+  if(fr) fr.onchange=e=>{state.form.region=e.target.value;};
+  document.getElementById("btnGuardar").onclick=guardar;
 }
 
-// ── VISTA: DETALLE ────────────────────────────────────────────────────────────
-function renderDetalle() {
-  const d = state.despachos.find(x => x.id === state.selectedId);
-  if (!d) return renderLista();
+// ── DETALLE ───────────────────────────────────────────────────────────────────
+function renderDetalle(){
+  const d=state.despachos.find(x=>x.id===state.selectedId);
+  if(!d) return renderLista();
+  const tipoLabel=d.tipo==="retiro"?"🏭 Retiro nacional":"📦 Envío a provincia";
   return `
     <div class="header">
       <button class="btn-back" id="btnBack">←</button>
@@ -354,38 +329,39 @@ function renderDetalle() {
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
           <div>
             <div style="font-size:18px;font-weight:700">${d.nombre}</div>
-            ${d.rut ? `<div style="color:#888;font-size:13px">RUT: ${d.rut}</div>` : ""}
+            ${d.rut?`<div style="color:#888;font-size:13px">RUT: ${d.rut}</div>`:""}
+            <div style="font-size:12px;color:#666;margin-top:4px">${tipoLabel}</div>
           </div>
           ${badge(d.estado)}
         </div>
-        ${d.agencia  ? `<div class="row"><span class="lbl">Agencia</span><span class="val">${d.agencia}</span></div>` : ""}
-        ${d.destino  ? `<div class="row"><span class="lbl">Destino</span><span class="val">${d.destino}</span></div>` : ""}
-        ${d.region   ? `<div class="row"><span class="lbl">Región</span><span class="val">${d.region}</span></div>` : ""}
-        ${d.notas    ? `<div class="row"><span class="lbl">Notas</span><span class="val">${d.notas}</span></div>` : ""}
+        ${getEmpresaLabel(d)?`<div class="row"><span class="lbl">${d.tipo==="retiro"?"Empresa":"Agencia"}</span><span class="val">${getEmpresaLabel(d)}</span></div>`:""}
+        ${d.destino?`<div class="row"><span class="lbl">${d.tipo==="retiro"?"Dirección":"Destino"}</span><span class="val">${d.destino}</span></div>`:""}
+        ${d.region?`<div class="row"><span class="lbl">Región</span><span class="val">${d.region}</span></div>`:""}
+        ${d.notas?`<div class="row"><span class="lbl">Notas</span><span class="val">${d.notas}</span></div>`:""}
         <div class="row"><span class="lbl">Ingresado</span><span class="val">${d.fecha}</span></div>
       </div>
-      ${d.imagen ? `<img src="${d.imagen}" style="width:100%;border-radius:12px;margin-bottom:16px" />` : ""}
       <div style="font-size:13px;color:#aaa;font-weight:600;margin-bottom:10px">CAMBIAR ESTADO</div>
-      ${Object.entries(ESTADOS).map(([k,v]) => `
-        <button class="btn-estado" data-estado="${k}"
-          style="color:${v.color};border-color:${d.estado===k?v.color:'#333'};background:${d.estado===k?v.bg:'#1a1a1a'}">
+      ${Object.entries(ESTADOS).map(([k,v])=>`
+        <button class="btn-estado" data-estado="${k}" data-fbkey="${d.fbKey||""}"
+          style="color:${v.color};border-color:${d.estado===k?v.color:"#333"};background:${d.estado===k?v.bg:"#1a1a1a"}">
           ${d.estado===k?"✓ ":""}${v.label}
         </button>`).join("")}
     </div>`;
 }
-
-function bindDetalle() {
-  document.getElementById("btnBack").onclick = () => setState({ view: "lista" });
-  document.getElementById("btnDelete").onclick = () => {
-    if (confirm("¿Eliminar este despacho?")) eliminar(state.selectedId);
+function bindDetalle(){
+  document.getElementById("btnBack").onclick=()=>setState({view:"lista"});
+  document.getElementById("btnDelete").onclick=()=>{
+    const d=state.despachos.find(x=>x.id===state.selectedId);
+    if(confirm("¿Eliminar este despacho?")) dbEliminar(state.selectedId,d?.fbKey);
   };
-  document.querySelectorAll(".btn-estado[data-estado]").forEach(btn => {
-    btn.onclick = () => { cambiarEstado(state.selectedId, btn.dataset.estado); };
+  document.querySelectorAll(".btn-estado").forEach(btn=>{
+    btn.onclick=()=>dbEstado(state.selectedId,btn.dataset.fbkey,btn.dataset.estado);
   });
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-render();
+if(window._firebaseReady){initStorage();}
+else{window.addEventListener("firebaseReady",initStorage);setTimeout(initStorage,3000);}
 </script>
 </body>
 </html>
