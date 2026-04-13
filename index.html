@@ -160,6 +160,7 @@ async function handleFile(file){
           break;
         }
       }
+      console.log("=== TEXTO OCR ===\n" + text);
       state.form.nombre = nombre;
       // RUT — busca línea con RUT: primero, luego cualquier RUT en el texto
       let rut = "";
