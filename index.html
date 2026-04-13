@@ -28,134 +28,154 @@
   </script>
 
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Inter, sans-serif; background: #0f0f0f; color: #f1f1f1; min-height: 100vh; }
-    input, select, textarea, button { font-family: inherit; }
-    .header { background: #1a1a1a; border-bottom: 1px solid #2a2a2a; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10; }
-    .btn-primary { background: linear-gradient(135deg, #e07b00, #f59e0b); color: #fff; border: none; border-radius: 10px; padding: 11px 18px; font-weight: 700; font-size: 14px; cursor: pointer; }
-    .btn-back { background: none; border: none; color: #aaa; font-size: 22px; cursor: pointer; padding: 4px 8px; }
-    .btn-delete { background: none; border: none; color: #ef4444; font-size: 20px; cursor: pointer; }
-    .btn-estado { width: 100%; border-radius: 10px; padding: 13px 16px; font-size: 15px; font-weight: 600; cursor: pointer; text-align: left; margin-bottom: 10px; }
-    .field { margin-bottom: 14px; }
-    .field label { font-size: 12px; color: #888; display: block; margin-bottom: 5px; }
-    .field input, .field select, .field textarea { width: 100%; background: #252525; border: 1px solid #333; border-radius: 10px; padding: 11px 12px; color: #fff; font-size: 15px; outline: none; }
-    .field textarea { resize: none; }
-    .field input::placeholder { color: #555; }
-    .card { background: #1a1a1a; border-radius: 14px; padding: 16px; cursor: pointer; border: 1px solid #2a2a2a; margin-bottom: 10px; }
-    .card:active { opacity: 0.8; }
-    .counters { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; padding: 14px 16px 0; }
-    .counter { border-radius: 12px; padding: 10px 8px; text-align: center; cursor: pointer; border: 1px solid #2a2a2a; background: #1a1a1a; }
-    .counter .num { font-size: 22px; font-weight: 700; }
-    .counter .lbl { font-size: 10px; color: #888; margin-top: 2px; }
-    .badge { border-radius: 20px; padding: 3px 10px; font-size: 12px; font-weight: 600; border: 1px solid; white-space: nowrap; }
-    .page { max-width: 600px; margin: 0 auto; padding: 16px; }
-    .row { display: flex; gap: 8px; margin-bottom: 8px; }
-    .row .lbl { font-size: 13px; color: #666; min-width: 80px; flex-shrink: 0; }
-    .row .val { font-size: 13px; color: #ddd; }
-    .empty { text-align: center; color: #555; padding: 50px 0; font-size: 15px; }
-    .loading { text-align: center; color: #888; padding: 40px 0; }
-    .tipo-tabs { display: flex; gap: 10px; margin-bottom: 16px; }
-    .tipo-tab { flex: 1; padding: 10px; border-radius: 10px; border: 1px solid #333; background: #1a1a1a; color: #888; font-size: 14px; font-weight: 600; cursor: pointer; text-align: center; }
-    .tipo-tab.active { border-color: #e07b00; color: #e07b00; background: #2a1f00; }
-    .section-title { font-size: 11px; color: #666; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; margin-top: 4px; }
-    #banner { background: #2a1f00; border: 1px solid #e07b00; border-radius: 12px; padding: 12px 16px; margin: 12px 16px; font-size: 13px; color: #f59e0b; display: none; }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Inter,sans-serif;background:#0f0f0f;color:#f1f1f1;min-height:100vh}
+    input,select,textarea,button{font-family:inherit}
+    .header{background:#1a1a1a;border-bottom:1px solid #2a2a2a;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}
+    .btn-primary{background:linear-gradient(135deg,#e07b00,#f59e0b);color:#fff;border:none;border-radius:10px;padding:11px 18px;font-weight:700;font-size:14px;cursor:pointer}
+    .btn-back{background:none;border:none;color:#aaa;font-size:22px;cursor:pointer;padding:4px 8px}
+    .btn-delete{background:none;border:none;color:#ef4444;font-size:20px;cursor:pointer}
+    .btn-estado{width:100%;border-radius:10px;padding:13px 16px;font-size:15px;font-weight:600;cursor:pointer;text-align:left;margin-bottom:10px}
+    .field{margin-bottom:14px}
+    .field label{font-size:12px;color:#888;display:block;margin-bottom:5px}
+    .field input,.field select,.field textarea{width:100%;background:#252525;border:1px solid #333;border-radius:10px;padding:11px 12px;color:#fff;font-size:15px;outline:none}
+    .field textarea{resize:none}
+    .field input::placeholder{color:#555}
+    .card{background:#1a1a1a;border-radius:14px;padding:16px;cursor:pointer;border:1px solid #2a2a2a;margin-bottom:10px}
+    .counters{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;padding:14px 16px 0}
+    .counter{border-radius:12px;padding:10px 8px;text-align:center;cursor:pointer;border:1px solid #2a2a2a;background:#1a1a1a}
+    .counter .num{font-size:22px;font-weight:700}
+    .counter .lbl{font-size:10px;color:#888;margin-top:2px}
+    .badge{border-radius:20px;padding:3px 10px;font-size:12px;font-weight:600;border:1px solid;white-space:nowrap}
+    .page{max-width:600px;margin:0 auto;padding:16px}
+    .row{display:flex;gap:8px;margin-bottom:8px}
+    .row .lbl{font-size:13px;color:#666;min-width:80px;flex-shrink:0}
+    .row .val{font-size:13px;color:#ddd}
+    .empty{text-align:center;color:#555;padding:50px 0;font-size:15px}
+    .tabs{display:flex;gap:8px;margin-bottom:16px}
+    .tab{flex:1;padding:10px 6px;border-radius:10px;border:1px solid #333;background:#1a1a1a;color:#888;font-size:13px;font-weight:600;cursor:pointer;text-align:center;transition:all .2s}
+    .tab.active{border-color:#e07b00;color:#e07b00;background:#2a1f00}
+    .upload-area{border:2px dashed #333;border-radius:14px;padding:20px;text-align:center;cursor:pointer;background:#1a1a1a;margin-bottom:14px}
+    .upload-area img{max-height:150px;border-radius:8px;max-width:100%}
+    .extracting{color:#f59e0b;text-align:center;margin:6px 0;font-size:13px}
+    .extract-error{color:#ef4444;font-size:12px;margin-bottom:8px}
+    .section-sep{font-size:11px;color:#555;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin:16px 0 10px}
   </style>
 </head>
 <body>
-<div id="banner">⚠️ Firebase no configurado — datos guardados solo localmente.</div>
-<div id="app"><div class="loading">Cargando...</div></div>
+<div id="app"><div style="text-align:center;padding:40px;color:#888">Cargando...</div></div>
 
 <script>
-const REGIONES = [
-  "Arica y Parinacota","Tarapacá","Antofagasta","Atacama","Coquimbo",
-  "Valparaíso","Región Metropolitana","O'Higgins","Maule","Ñuble","Biobío",
-  "La Araucanía","Los Ríos","Los Lagos","Aysén","Magallanes"
-];
-
-const AGENCIAS_ENVIO = ["Starken","Varmont","PDQ","Chevallier","FedEx","Chilexpress","RapidCargo","Uber Envíos","Infante","Otra..."];
-const EMPRESAS_RETIRO = ["Blescom","Esmeralda","American Air","Otra..."];
-
-const ESTADOS = {
-  pendiente:  { label: "Pendiente",        color: "#f59e0b", bg: "#2a1f00" },
-  entregado:  { label: "Entregado ✓",      color: "#10b981", bg: "#002a1a" },
-  falta_doc:  { label: "Falta documento",  color: "#ef4444", bg: "#2a0000" },
+const REGIONES=["Arica y Parinacota","Tarapacá","Antofagasta","Atacama","Coquimbo","Valparaíso","Región Metropolitana","O'Higgins","Maule","Ñuble","Biobío","La Araucanía","Los Ríos","Los Lagos","Aysén","Magallanes"];
+const AGENCIAS=["Starken","Varmont","PDQ","Chevallier","FedEx","Chilexpress","RapidCargo","Uber Envíos","Infante","Otra..."];
+const EMPRESAS_NACIONAL=["Blescom","American Air","Esmeralda","Otra..."];
+const ESTADOS={
+  pendiente:{label:"Pendiente",color:"#f59e0b",bg:"#2a1f00"},
+  entregado:{label:"Entregado ✓",color:"#10b981",bg:"#002a1a"},
+  falta_doc:{label:"Falta documento",color:"#ef4444",bg:"#2a0000"},
 };
 
-const emptyForm = () => ({
-  nombre:"", rut:"", tipo:"envio",
-  agencia:"", agenciaCustom:"",
-  empresa:"", empresaCustom:"",
-  destino:"", region:"", notas:""
+const emptyForm=()=>({
+  nombre:"",rut:"",
+  tipoCompra:"importacion", // importacion | nacional
+  empresaNacional:"",empresaNacionalCustom:"",
+  destino:"provincia", // provincia | oficina | bodega
+  agencia:"",agenciaCustom:"",
+  direccionDestino:"",region:"",
+  notas:"",
+  imgPreview:null,extracting:false,extractError:""
 });
 
-let state = {
-  despachos: [],
-  view: "lista",
-  selectedId: null,
-  filtro: "todos",
-  form: emptyForm(),
-  useFirebase: false,
-};
+let state={despachos:[],view:"lista",selectedId:null,filtro:"todos",form:emptyForm(),useFirebase:false};
 
-// ── STORAGE ───────────────────────────────────────────────────────────────────
-function initStorage() {
-  if (window._firebaseReady && window._db) {
-    state.useFirebase = true;
-    window._db.ref("despachos").on("value", snap => {
-      const val = snap.val();
-      state.despachos = val ? Object.entries(val).map(([k,v])=>({...v,fbKey:k})) : [];
+// ── FIREBASE ──────────────────────────────────────────────────────────────────
+function initStorage(){
+  if(window._firebaseReady&&window._db){
+    state.useFirebase=true;
+    window._db.ref("despachos").on("value",snap=>{
+      const val=snap.val();
+      state.despachos=val?Object.entries(val).map(([k,v])=>({...v,fbKey:k})):[];
       state.despachos.sort((a,b)=>(b.ts||0)-(a.ts||0));
       render();
     });
   } else {
-    document.getElementById("banner").style.display = "block";
-    try { state.despachos = JSON.parse(localStorage.getItem("dcold")||"[]"); } catch { state.despachos=[]; }
+    try{state.despachos=JSON.parse(localStorage.getItem("dcold")||"[]");}catch{state.despachos=[];}
     render();
   }
 }
-
-function saveLocal() {
-  localStorage.setItem("dcold", JSON.stringify(state.despachos));
+function saveLocal(){localStorage.setItem("dcold",JSON.stringify(state.despachos));}
+function dbGuardar(d){
+  if(state.useFirebase){window._db.ref("despachos").push(d);}
+  else{state.despachos=[d,...state.despachos];saveLocal();render();}
 }
-
-async function dbGuardar(d) {
-  if (state.useFirebase) {
-    window._db.ref("despachos").push(d);
-  } else { state.despachos=[d,...state.despachos]; saveLocal(); render(); }
+function dbEstado(id,fbKey,estado){
+  if(state.useFirebase&&fbKey){window._db.ref("despachos/"+fbKey).update({estado});}
+  else{state.despachos=state.despachos.map(d=>d.id===id?{...d,estado}:d);saveLocal();render();}
 }
-async function dbEstado(id, fbKey, estado) {
-  if (state.useFirebase && fbKey) {
-    window._db.ref("despachos/"+fbKey).update({estado});
-  } else { state.despachos=state.despachos.map(d=>d.id===id?{...d,estado}:d); saveLocal(); render(); }
-}
-async function dbEliminar(id, fbKey) {
-  if (state.useFirebase && fbKey) {
-    window._db.ref("despachos/"+fbKey).remove();
-  } else { state.despachos=state.despachos.filter(d=>d.id!==id); saveLocal(); }
+function dbEliminar(id,fbKey){
+  if(state.useFirebase&&fbKey){window._db.ref("despachos/"+fbKey).remove();}
+  else{state.despachos=state.despachos.filter(d=>d.id!==id);saveLocal();}
   setState({view:"lista",selectedId:null});
 }
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 function setState(p){Object.assign(state,p);render();}
-function badge(e){const v=ESTADOS[e];return `<span class="badge" style="color:${v.color};border-color:${v.color};background:${v.bg}">${v.label}</span>`;}
+function badge(e){const v=ESTADOS[e];return`<span class="badge" style="color:${v.color};border-color:${v.color};background:${v.bg}">${v.label}</span>`;}
 function counts(){return{pendiente:state.despachos.filter(d=>d.estado==="pendiente").length,entregado:state.despachos.filter(d=>d.estado==="entregado").length,falta_doc:state.despachos.filter(d=>d.estado==="falta_doc").length};}
-function getEmpresaLabel(d){
-  if(d.tipo==="retiro") return d.empresa==="Otra..."?(d.empresaCustom||"Otra"):d.empresa;
-  return d.agencia==="Otra..."?(d.agenciaCustom||"Otra"):d.agencia;
+function getResumen(d){
+  const tc=d.tipoCompra==="importacion"?"🌏 Importación":"🇨🇱 Compra nacional";
+  let dest="";
+  if(d.destino==="provincia") dest=`📦 Provincia${d.region?" · "+d.region:""}`;
+  else if(d.destino==="oficina") dest="🏢 Oficina";
+  else dest="🏭 Bodega";
+  return tc+" · "+dest;
+}
+
+// ── EXTRACCIÓN OCR ────────────────────────────────────────────────────────────
+async function handleFile(file){
+  if(!file)return;
+  state.form.extractError="";state.form.extracting=true;render();setTimeout(bindNuevo,0);
+  const reader=new FileReader();
+  reader.onload=async e=>{
+    state.form.imgPreview=e.target.result;
+    // Usar Tesseract.js CDN para OCR gratuito
+    try{
+      const {createWorker}=Tesseract;
+      const worker=await createWorker("spa");
+      const {data:{text}}=await worker.recognize(file);
+      await worker.terminate();
+      // Extraer RUT (formato XX.XXX.XXX-X o XXXXXXXX-X)
+      const rutMatch=text.match(/\b(\d{1,2}\.?\d{3}\.?\d{3}-[\dkK])\b/);
+      // Extraer nombre — busca después de "SEÑORES:" o "Cliente:" o primera línea con mayúsculas
+      const nombreMatch=text.match(/(?:SE[ÑN]ORES?|CLIENTE|RAZON SOCIAL|EMPRESA)[:\s]+([A-ZÁÉÍÓÚÑ][^\n]{3,50})/i)
+        ||text.match(/^([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s]{5,40})$/m);
+      state.form.nombre=nombreMatch?nombreMatch[1].trim():"";
+      state.form.rut=rutMatch?rutMatch[1]:"";
+      state.form.extracting=false;
+      if(!state.form.nombre&&!state.form.rut) state.form.extractError="No se pudo extraer. Rellena manualmente.";
+    }catch{
+      state.form.extracting=false;
+      state.form.extractError="No se pudo extraer. Rellena manualmente.";
+    }
+    render();setTimeout(bindNuevo,0);
+  };
+  reader.readAsDataURL(file);
 }
 
 // ── GUARDAR ───────────────────────────────────────────────────────────────────
 function guardar(){
-  if(!state.form.nombre.trim()) return;
   const f=state.form;
+  if(!f.nombre.trim())return;
   dbGuardar({
-    id:Date.now(), ts:Date.now(),
-    nombre:f.nombre.trim(), rut:f.rut.trim(),
-    tipo:f.tipo,
-    agencia:f.agencia, agenciaCustom:f.agenciaCustom.trim(),
-    empresa:f.empresa, empresaCustom:f.empresaCustom.trim(),
-    destino:f.destino.trim(), region:f.region,
-    notas:f.notas.trim(),
+    id:Date.now(),ts:Date.now(),
+    nombre:f.nombre.trim(),rut:f.rut.trim(),
+    tipoCompra:f.tipoCompra,
+    empresaNacional:f.empresaNacional,
+    empresaNacionalCustom:f.empresaNacionalCustom.trim(),
+    destino:f.destino,
+    agencia:f.agencia,agenciaCustom:f.agenciaCustom.trim(),
+    direccionDestino:f.direccionDestino.trim(),
+    region:f.region,notas:f.notas.trim(),
     estado:"pendiente",
     fecha:new Date().toLocaleDateString("es-CL"),
   });
@@ -175,16 +195,14 @@ function renderLista(){
   const c=counts();
   const filtrados=state.filtro==="todos"?state.despachos:state.despachos.filter(d=>d.estado===state.filtro);
   const cards=filtrados.length===0
-    ?`<div class="empty">${state.despachos.length===0?"No hay despachos aún.":"Sin resultados para este filtro."}</div>`
+    ?`<div class="empty">${state.despachos.length===0?"No hay despachos. Agrega el primero.":"Sin resultados."}</div>`
     :filtrados.map(d=>`
       <div class="card" data-id="${d.id}">
         <div style="display:flex;justify-content:space-between;align-items:flex-start">
           <div style="flex:1;min-width:0">
             <div style="font-weight:600;font-size:15px;margin-bottom:3px">${d.nombre}</div>
             ${d.rut?`<div style="font-size:12px;color:#666">RUT: ${d.rut}</div>`:""}
-            <div style="font-size:12px;color:#666;margin-top:4px">
-              ${d.tipo==="retiro"?"🏭 Retiro":"📦 Envío"} · ${[getEmpresaLabel(d),d.region].filter(Boolean).join(" · ")}
-            </div>
+            <div style="font-size:12px;color:#666;margin-top:4px">${getResumen(d)}</div>
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;margin-left:8px">
             ${badge(d.estado)}
@@ -192,8 +210,7 @@ function renderLista(){
           </div>
         </div>
       </div>`).join("");
-
-  return `
+  return`
     <div class="header">
       <div>
         <div style="font-weight:700;font-size:17px">📦 Despachos Colderman</div>
@@ -211,100 +228,128 @@ function renderLista(){
     <div class="page">${cards}</div>`;
 }
 function bindLista(){
-  document.getElementById("btnNuevo").onclick=()=>setState({view:"nuevo"});
-  Object.keys(ESTADOS).forEach(k=>{
-    document.getElementById("cnt-"+k).onclick=()=>setState({filtro:state.filtro===k?"todos":k});
-  });
-  document.querySelectorAll(".card[data-id]").forEach(el=>{
-    el.onclick=()=>setState({view:"detalle",selectedId:+el.dataset.id});
-  });
+  document.getElementById("btnNuevo").onclick=()=>setState({view:"nuevo",form:emptyForm()});
+  Object.keys(ESTADOS).forEach(k=>{document.getElementById("cnt-"+k).onclick=()=>setState({filtro:state.filtro===k?"todos":k});});
+  document.querySelectorAll(".card[data-id]").forEach(el=>{el.onclick=()=>setState({view:"detalle",selectedId:+el.dataset.id});});
 }
 
 // ── NUEVO ─────────────────────────────────────────────────────────────────────
 function renderNuevo(){
   const f=state.form;
-  const isEnvio=f.tipo==="envio";
-  const showAgenciaCustom=isEnvio&&f.agencia==="Otra...";
-  const showEmpresaCustom=!isEnvio&&f.empresa==="Otra...";
-  return `
+  const isNacional=f.tipoCompra==="nacional";
+  const showEmpresaCustom=isNacional&&f.empresaNacional==="Otra...";
+  const isProvincia=f.destino==="provincia";
+  const showAgenciaCustom=isProvincia&&f.agencia==="Otra...";
+  return`
     <div class="header">
       <button class="btn-back" id="btnBack">←</button>
       <span style="font-weight:700;font-size:16px">Nuevo Despacho</span>
       <div style="width:40px"></div>
     </div>
     <div class="page">
+
+      <!-- UPLOAD -->
+      <div class="upload-area" id="uploadArea">
+        ${f.imgPreview
+          ?`<img src="${f.imgPreview}" alt="doc" />`
+          :`<div style="font-size:30px">📎</div><div style="color:#888;font-size:13px;margin-top:6px">Toca para subir pantallazo de factura o cotización</div>`}
+      </div>
+      <input type="file" id="fileInput" accept="image/*" style="display:none" />
+      ${f.extracting?`<div class="extracting">⏳ Extrayendo datos...</div>`:""}
+      ${f.extractError?`<div class="extract-error">${f.extractError}</div>`:""}
+
+      <!-- DATOS CLIENTE -->
       <div class="field"><label>Nombre del cliente / empresa *</label>
-        <input id="fNombre" value="${f.nombre}" placeholder="Ej: Transportes Pérez SpA" /></div>
+        <input id="fNombre" value="${f.nombre}" placeholder="Extraído o escribe aquí" /></div>
       <div class="field"><label>RUT</label>
         <input id="fRut" value="${f.rut}" placeholder="Ej: 12.345.678-9" /></div>
 
-      <div class="section-title">Tipo de movimiento</div>
-      <div class="tipo-tabs" style="margin-bottom:16px">
-        <div class="tipo-tab ${isEnvio?"active":""}" id="tabEnvio">📦 Envío a provincia</div>
-        <div class="tipo-tab ${!isEnvio?"active":""}" id="tabRetiro">🏭 Retiro nacional</div>
+      <!-- TIPO COMPRA -->
+      <div class="section-sep">Tipo de compra</div>
+      <div class="tabs">
+        <div class="tab ${!isNacional?"active":""}" id="tabImport">🌏 Importación</div>
+        <div class="tab ${isNacional?"active":""}" id="tabNacional">🇨🇱 Compra nacional</div>
       </div>
 
-      ${isEnvio?`
+      ${isNacional?`
+        <div class="field"><label>Empresa proveedora</label>
+          <select id="fEmpresaNacional">
+            <option value="">Seleccionar empresa...</option>
+            ${EMPRESAS_NACIONAL.map(e=>`<option ${f.empresaNacional===e?"selected":""}>${e}</option>`).join("")}
+          </select></div>
+        ${showEmpresaCustom?`<div class="field"><label>¿Cuál empresa?</label>
+          <input id="fEmpresaCustom" value="${f.empresaNacionalCustom}" placeholder="Nombre de la empresa" /></div>`:""}
+      `:""}
+
+      <!-- DESTINO -->
+      <div class="section-sep">Destino del envío</div>
+      <div class="tabs">
+        <div class="tab ${isProvincia?"active":""}" id="tabProvincia">📦 Provincia</div>
+        <div class="tab ${f.destino==="oficina"?"active":""}" id="tabOficina">🏢 Oficina</div>
+        <div class="tab ${f.destino==="bodega"?"active":""}" id="tabBodega">🏭 Bodega</div>
+      </div>
+
+      ${isProvincia?`
         <div class="field"><label>Agencia de envío</label>
           <select id="fAgencia">
             <option value="">Seleccionar agencia...</option>
-            ${AGENCIAS_ENVIO.map(a=>`<option ${f.agencia===a?"selected":""}>${a}</option>`).join("")}
+            ${AGENCIAS.map(a=>`<option ${f.agencia===a?"selected":""}>${a}</option>`).join("")}
           </select></div>
         ${showAgenciaCustom?`<div class="field"><label>¿Cuál agencia?</label>
           <input id="fAgenciaCustom" value="${f.agenciaCustom}" placeholder="Nombre de la agencia" /></div>`:""}
-        <div class="field"><label>Destino (sucursal o dirección)</label>
-          <input id="fDestino" value="${f.destino}" placeholder="Ej: Sucursal Starken Talca" /></div>
+        <div class="field"><label>Dirección / sucursal de destino</label>
+          <input id="fDireccion" value="${f.direccionDestino}" placeholder="Ej: Sucursal Starken Talca" /></div>
         <div class="field"><label>Región de destino</label>
           <select id="fRegion">
             <option value="">Seleccionar región...</option>
             ${REGIONES.map(r=>`<option ${f.region===r?"selected":""}>${r}</option>`).join("")}
           </select></div>
-      `:`
-        <div class="field"><label>Empresa de retiro</label>
-          <select id="fEmpresa">
-            <option value="">Seleccionar empresa...</option>
-            ${EMPRESAS_RETIRO.map(e=>`<option ${f.empresa===e?"selected":""}>${e}</option>`).join("")}
-          </select></div>
-        ${showEmpresaCustom?`<div class="field"><label>¿Cuál empresa?</label>
-          <input id="fEmpresaCustom" value="${f.empresaCustom}" placeholder="Nombre de la empresa" /></div>`:""}
-        <div class="field"><label>Dirección de retiro</label>
-          <input id="fDestino" value="${f.destino}" placeholder="Ej: Av. Américo Vespucio 123, Quilicura" /></div>
-      `}
+      `:`<div style="background:#1a1a1a;border-radius:10px;padding:12px;margin-bottom:14px;font-size:13px;color:#888">
+          ${f.destino==="oficina"?"🏢 El pedido se recibe en oficina.":"🏭 El pedido se recoge en bodega."}
+        </div>`}
 
       <div class="field"><label>Notas adicionales</label>
         <textarea id="fNotas" rows="2" placeholder="Observaciones...">${f.notas}</textarea></div>
-      <button class="btn-primary" id="btnGuardar" style="width:100%;padding:14px;font-size:16px">Guardar despacho</button>
+      <button class="btn-primary" id="btnGuardar" style="width:100%;padding:14px;font-size:16px;margin-bottom:24px">Guardar despacho</button>
     </div>`;
 }
 function bindNuevo(){
-  const rerender=()=>{const v=state.view;state.view="nuevo";render();};
+  const re=()=>{render();setTimeout(bindNuevo,0);};
   document.getElementById("btnBack").onclick=()=>setState({view:"lista",form:emptyForm()});
+  document.getElementById("uploadArea").onclick=()=>document.getElementById("fileInput").click();
+  document.getElementById("fileInput").onchange=e=>handleFile(e.target.files[0]);
   document.getElementById("fNombre").oninput=e=>{state.form.nombre=e.target.value;};
   document.getElementById("fRut").oninput=e=>{state.form.rut=e.target.value;};
-  document.getElementById("fNotas").oninput=e=>{state.form.notas=e.target.value;};
-  document.getElementById("tabEnvio").onclick=()=>{state.form.tipo="envio";render();setTimeout(bindNuevo,0);};
-  document.getElementById("tabRetiro").onclick=()=>{state.form.tipo="retiro";render();setTimeout(bindNuevo,0);};
+  document.getElementById("tabImport").onclick=()=>{state.form.tipoCompra="importacion";re();};
+  document.getElementById("tabNacional").onclick=()=>{state.form.tipoCompra="nacional";re();};
+  document.getElementById("tabProvincia").onclick=()=>{state.form.destino="provincia";re();};
+  document.getElementById("tabOficina").onclick=()=>{state.form.destino="oficina";re();};
+  document.getElementById("tabBodega").onclick=()=>{state.form.destino="bodega";re();};
+  const fn=document.getElementById("fEmpresaNacional");
+  if(fn)fn.onchange=e=>{state.form.empresaNacional=e.target.value;re();};
+  const fc=document.getElementById("fEmpresaCustom");
+  if(fc)fc.oninput=e=>{state.form.empresaNacionalCustom=e.target.value;};
   const fa=document.getElementById("fAgencia");
-  if(fa) fa.onchange=e=>{state.form.agencia=e.target.value;render();setTimeout(bindNuevo,0);};
+  if(fa)fa.onchange=e=>{state.form.agencia=e.target.value;re();};
   const fac=document.getElementById("fAgenciaCustom");
-  if(fac) fac.oninput=e=>{state.form.agenciaCustom=e.target.value;};
-  const fe=document.getElementById("fEmpresa");
-  if(fe) fe.onchange=e=>{state.form.empresa=e.target.value;render();setTimeout(bindNuevo,0);};
-  const fec=document.getElementById("fEmpresaCustom");
-  if(fec) fec.oninput=e=>{state.form.empresaCustom=e.target.value;};
-  const fd=document.getElementById("fDestino");
-  if(fd) fd.oninput=e=>{state.form.destino=e.target.value;};
+  if(fac)fac.oninput=e=>{state.form.agenciaCustom=e.target.value;};
+  const fd=document.getElementById("fDireccion");
+  if(fd)fd.oninput=e=>{state.form.direccionDestino=e.target.value;};
   const fr=document.getElementById("fRegion");
-  if(fr) fr.onchange=e=>{state.form.region=e.target.value;};
+  if(fr)fr.onchange=e=>{state.form.region=e.target.value;};
+  const fno=document.getElementById("fNotas");
+  if(fno)fno.oninput=e=>{state.form.notas=e.target.value;};
   document.getElementById("btnGuardar").onclick=guardar;
 }
 
 // ── DETALLE ───────────────────────────────────────────────────────────────────
 function renderDetalle(){
   const d=state.despachos.find(x=>x.id===state.selectedId);
-  if(!d) return renderLista();
-  const tipoLabel=d.tipo==="retiro"?"🏭 Retiro nacional":"📦 Envío a provincia";
-  return `
+  if(!d)return renderLista();
+  const empresaLabel=d.empresaNacional==="Otra..."?(d.empresaNacionalCustom||"Otra"):d.empresaNacional;
+  const agenciaLabel=d.agencia==="Otra..."?(d.agenciaCustom||"Otra"):d.agencia;
+  const destinoLabel=d.destino==="provincia"?"📦 Envío a provincia":d.destino==="oficina"?"🏢 Recepción en oficina":"🏭 Recojo en bodega";
+  return`
     <div class="header">
       <button class="btn-back" id="btnBack">←</button>
       <span style="font-weight:700;font-size:16px">Detalle</span>
@@ -316,12 +361,14 @@ function renderDetalle(){
           <div>
             <div style="font-size:18px;font-weight:700">${d.nombre}</div>
             ${d.rut?`<div style="color:#888;font-size:13px">RUT: ${d.rut}</div>`:""}
-            <div style="font-size:12px;color:#666;margin-top:4px">${tipoLabel}</div>
           </div>
           ${badge(d.estado)}
         </div>
-        ${getEmpresaLabel(d)?`<div class="row"><span class="lbl">${d.tipo==="retiro"?"Empresa":"Agencia"}</span><span class="val">${getEmpresaLabel(d)}</span></div>`:""}
-        ${d.destino?`<div class="row"><span class="lbl">${d.tipo==="retiro"?"Dirección":"Destino"}</span><span class="val">${d.destino}</span></div>`:""}
+        <div class="row"><span class="lbl">Tipo</span><span class="val">${d.tipoCompra==="importacion"?"🌏 Importación":"🇨🇱 Compra nacional"}</span></div>
+        ${empresaLabel?`<div class="row"><span class="lbl">Empresa</span><span class="val">${empresaLabel}</span></div>`:""}
+        <div class="row"><span class="lbl">Destino</span><span class="val">${destinoLabel}</span></div>
+        ${agenciaLabel?`<div class="row"><span class="lbl">Agencia</span><span class="val">${agenciaLabel}</span></div>`:""}
+        ${d.direccionDestino?`<div class="row"><span class="lbl">Dirección</span><span class="val">${d.direccionDestino}</span></div>`:""}
         ${d.region?`<div class="row"><span class="lbl">Región</span><span class="val">${d.region}</span></div>`:""}
         ${d.notas?`<div class="row"><span class="lbl">Notas</span><span class="val">${d.notas}</span></div>`:""}
         <div class="row"><span class="lbl">Ingresado</span><span class="val">${d.fecha}</span></div>
@@ -338,7 +385,7 @@ function bindDetalle(){
   document.getElementById("btnBack").onclick=()=>setState({view:"lista"});
   document.getElementById("btnDelete").onclick=()=>{
     const d=state.despachos.find(x=>x.id===state.selectedId);
-    if(confirm("¿Eliminar este despacho?")) dbEliminar(state.selectedId,d?.fbKey);
+    if(confirm("¿Eliminar este despacho?"))dbEliminar(state.selectedId,d?.fbKey);
   };
   document.querySelectorAll(".btn-estado").forEach(btn=>{
     btn.onclick=()=>dbEstado(state.selectedId,btn.dataset.fbkey,btn.dataset.estado);
@@ -346,7 +393,12 @@ function bindDetalle(){
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-if(window._firebaseReady){initStorage();}
+// Cargar Tesseract.js para OCR
+const t=document.createElement("script");
+t.src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
+document.head.appendChild(t);
+
+if(window._firebaseReady)initStorage();
 else{window.addEventListener("firebaseReady",initStorage);setTimeout(initStorage,3000);}
 </script>
 </body>
