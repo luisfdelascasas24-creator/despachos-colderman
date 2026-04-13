@@ -121,6 +121,7 @@ function dbEliminar(id,fbKey){
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 function setState(p){
   if(window._pasteCleanup){window._pasteCleanup();window._pasteCleanup=null;}
+  if(window._pasteNuevoCleanup){window._pasteNuevoCleanup();window._pasteNuevoCleanup=null;}
   Object.assign(state,p);render();
 }
 function badge(e){const v=ESTADOS[e];return`<span class="badge" style="color:${v.color};border-color:${v.color};background:${v.bg}">${v.label}</span>`;}
@@ -201,6 +202,7 @@ function guardar(){
     id:Date.now(),ts:Date.now(),
     nombre:f.nombre.trim(),rut:f.rut.trim(),
     nDoc:f.nDoc.trim(),bultos:f.bultos,
+    docImg:f.imgPreview||"",
     tipoCompra:f.tipoCompra,
     empresaNacional:f.empresaNacional,
     empresaNacionalCustom:f.empresaNacionalCustom.trim(),
@@ -406,6 +408,20 @@ function bindNuevo(){
   document.getElementById("btnBack").onclick=()=>setState({view:"lista",form:emptyForm()});
   document.getElementById("uploadArea").onclick=()=>document.getElementById("fileInput").click();
   document.getElementById("fileInput").onchange=e=>handleFile(e.target.files[0]);
+
+  // Pegar con Ctrl+V en formulario nuevo
+  const onPasteNuevo=e=>{
+    const items=e.clipboardData?.items;
+    if(!items)return;
+    for(const item of items){
+      if(item.type.startsWith("image/")){
+        handleFile(item.getAsFile());
+        break;
+      }
+    }
+  };
+  document.addEventListener("paste",onPasteNuevo);
+  window._pasteNuevoCleanup=()=>document.removeEventListener("paste",onPasteNuevo);
   document.getElementById("fNombre").oninput=e=>{state.form.nombre=e.target.value;};
   document.getElementById("fRut").oninput=e=>{state.form.rut=e.target.value;};
   document.getElementById("fNDoc").oninput=e=>{state.form.nDoc=e.target.value;};
@@ -463,6 +479,11 @@ function renderDetalle(){
         ${d.notas?`<div class="row"><span class="lbl">Notas</span><span class="val">${d.notas}</span></div>`:""}
         <div class="row"><span class="lbl">Ingresado</span><span class="val">${d.fecha}</span></div>
       </div>
+      <div style="font-size:13px;color:#aaa;font-weight:600;margin:16px 0 10px">DOCUMENTO</div>
+      ${d.docImg
+        ?`<img src="${d.docImg}" id="docMiniatura" style="width:100%;max-height:120px;object-fit:cover;border-radius:12px;margin-bottom:16px;cursor:pointer" title="Toca para ver completo" />`
+        :`<div style="color:#555;font-size:13px;margin-bottom:16px">Sin documento adjunto.</div>`}
+
       <div style="font-size:13px;color:#aaa;font-weight:600;margin-bottom:10px">CAMBIAR ESTADO</div>
       ${Object.entries(ESTADOS).map(([k,v])=>`
         <button class="btn-estado" data-estado="${k}" data-fbkey="${d.fbKey||""}"
@@ -501,7 +522,17 @@ function bindDetalle(){
     btn.onclick=()=>dbEstado(state.selectedId,btn.dataset.fbkey,btn.dataset.estado);
   });
 
-  // WhatsApp — compartir foto + nombre con Web Share API
+  // Miniatura documento — abrir en grande al tocar
+  const docMini=document.getElementById("docMiniatura");
+  if(docMini&&d?.docImg){
+    docMini.onclick=()=>{
+      const overlay=document.createElement("div");
+      overlay.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px";
+      overlay.innerHTML=`<img src="${d.docImg}" style="max-width:100%;max-height:100%;border-radius:12px" /><button style="position:fixed;top:16px;right:16px;background:none;border:none;color:#fff;font-size:30px;cursor:pointer">✕</button>`;
+      overlay.onclick=()=>overlay.remove();
+      document.body.appendChild(overlay);
+    };
+  }
   const btnWa=document.getElementById("btnWhatsapp");
   if(btnWa&&d){
     btnWa.onclick=async(e)=>{
