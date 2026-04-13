@@ -144,14 +144,37 @@ async function handleFile(file){
       const worker=await createWorker("spa");
       const {data:{text}}=await worker.recognize(file);
       await worker.terminate();
-      // Extraer nombre — busca SEÑOR(ES): o CLIENTE: primero (es el destinatario, no el emisor)
-      const nombreMatch=text.match(/SE[ÑN]OR(?:ES)?[:\s]+([^\n]{3,60})/i)
-        ||text.match(/(?:CLIENTE|A NOMBRE DE|RAZON SOCIAL|DESTINATARIO)[:\s]+([^\n]{3,60})/i);
-      // Extraer RUT — busca la línea que dice RUT: seguida del número
-      const rutMatch=text.match(/\bRUT[:\s]+(\d{1,2}\.?\d{3}\.?\d{3}-[\dkK])/i)
-        ||text.match(/\b(\d{1,2}\.\d{3}\.\d{3}-[\dkK])\b/);
-      state.form.nombre=nombreMatch?nombreMatch[1].trim():"";
-      state.form.rut=rutMatch?rutMatch[1]:"";
+      // Buscar nombre con múltiples variaciones de "SEÑORES"
+      const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+      let nombre = "";
+      for (let i = 0; i < lines.length; i++) {
+        const l = lines[i].toUpperCase();
+        if (/SE[NÑ]OR|SENOR|CLIENTE|DESTINATARIO|A NOMBRE/.test(l)) {
+          // Puede estar en la misma línea después de ":" o en la siguiente
+          const partes = lines[i].split(/:\s*/);
+          if (partes.length > 1 && partes[1].trim().length > 2) {
+            nombre = partes[1].trim();
+          } else if (i + 1 < lines.length) {
+            nombre = lines[i + 1].trim();
+          }
+          break;
+        }
+      }
+      state.form.nombre = nombre;
+      // RUT — busca línea con RUT: primero, luego cualquier RUT en el texto
+      let rut = "";
+      for (let i = 0; i < lines.length; i++) {
+        const l = lines[i].toUpperCase();
+        if (/^RUT[:\s]/.test(l)) {
+          const m = lines[i].match(/(\d{1,2}[\.\d]*-[\dkK])/);
+          if (m) { rut = m[1]; break; }
+        }
+      }
+      if (!rut) {
+        const m = text.match(/\b(\d{1,2}\.\d{3}\.\d{3}-[\dkK])\b/);
+        if (m) rut = m[1];
+      }
+      state.form.rut = rut;
       state.form.extracting=false;
       if(!state.form.nombre&&!state.form.rut) state.form.extractError="No se pudo extraer. Rellena manualmente.";
     }catch{
