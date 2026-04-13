@@ -86,7 +86,7 @@ const emptyForm=()=>({
   imgPreview:null,extracting:false,extractError:""
 });
 
-let state={despachos:[],view:"lista",selectedId:null,filtro:"todos",busqueda:"",filtroDia:"todos",form:emptyForm(),useFirebase:false};
+let state={despachos:[],view:"lista",selectedId:null,filtro:"todos",busqueda:"",filtroDia:"todos",filtroAgencia:"",form:emptyForm(),useFirebase:false};
 
 // ── FIREBASE ──────────────────────────────────────────────────────────────────
 function initStorage(){
@@ -231,6 +231,10 @@ function renderLista(){
   const filtrados = (() => {
     let arr = state.filtro==="todos" ? state.despachos : state.despachos.filter(d=>d.estado===state.filtro);
     if (state.filtroDia==="hoy") arr=arr.filter(d=>d.fecha===hoy);
+    if (state.filtroAgencia) arr=arr.filter(d=>{
+      const ag=d.agencia==="Otra..."?(d.agenciaCustom||"Otra"):d.agencia;
+      return ag===state.filtroAgencia;
+    });
     if (state.busqueda.trim()) {
       const q = state.busqueda.toLowerCase().trim();
       arr = arr.filter(d => [d.nombre,d.rut,d.nDoc,d.agencia,d.agenciaCustom,d.direccionDestino,d.empresaNacional,d.empresaNacionalCustom,d.notas]
@@ -289,7 +293,7 @@ function renderLista(){
           <div class="lbl">${v.label}</div>
         </div>`).join("")}
     </div>
-    <div style="padding:10px 16px 0;max-width:600px;margin:0 auto;display:flex;gap:8px;align-items:center">
+    <div style="padding:8px 16px 0;max-width:600px;margin:0 auto;display:flex;gap:8px;align-items:center">
       <div style="position:relative;flex:1">
         <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#555;font-size:16px">🔍</span>
         <input id="searchInput" value="${state.busqueda||""}" placeholder="Buscar nombre, RUT, N° doc..." 
@@ -299,6 +303,12 @@ function renderLista(){
         📅 Hoy
       </button>
     </div>
+    <div style="padding:8px 16px 0;max-width:600px;margin:0 auto">
+      <select id="filtroAgencia" style="width:100%;background:#1a1a1a;border:1px solid ${state.filtroAgencia?"#e07b00":"#2a2a2a"};border-radius:10px;padding:10px 12px;color:${state.filtroAgencia?"#e07b00":"#888"};font-size:14px;outline:none">
+        <option value="">🚚 Filtrar por agencia...</option>
+        ${AGENCIAS.filter(a=>a!=="Otra...").map(a=>`<option value="${a}" ${state.filtroAgencia===a?"selected":""}>${a}</option>`).join("")}
+      </select>
+    </div>
     <div class="page">${cards}</div>`;
 }
 function bindLista(){
@@ -307,6 +317,7 @@ function bindLista(){
   document.querySelectorAll(".card[data-id]").forEach(el=>{el.onclick=()=>setState({view:"detalle",selectedId:+el.dataset.id});});
   document.getElementById("searchInput").oninput=e=>{state.busqueda=e.target.value;render();setTimeout(bindLista,0);};
   document.getElementById("btnHoy").onclick=()=>setState({filtroDia:state.filtroDia==="hoy"?"todos":"hoy"});
+  document.getElementById("filtroAgencia").onchange=e=>setState({filtroAgencia:e.target.value});
 }
 
 // ── NUEVO ─────────────────────────────────────────────────────────────────────
@@ -460,10 +471,17 @@ function renderDetalle(){
         </button>`).join("")}
       <div style="font-size:13px;color:#aaa;font-weight:600;margin:16px 0 10px">TICKET DE ENTREGA</div>
       ${d.ticketImg
-        ?`<img src="${d.ticketImg}" style="width:100%;border-radius:12px;margin-bottom:10px" />
-           <a id="btnWhatsapp" href="#" style="display:flex;align-items:center;justify-content:center;gap:8px;background:#25D366;color:#fff;border-radius:10px;padding:12px;font-weight:700;font-size:14px;text-decoration:none;margin-bottom:10px">
-             <span style="font-size:18px">📲</span> Compartir por WhatsApp
-           </a>`
+        ?`<img src="${d.ticketImg}" style="width:100%;border-radius:12px;margin-bottom:10px" id="ticketImgEl" />
+           <div style="display:flex;gap:8px;margin-bottom:10px">
+             <button id="btnWhatsapp"
+               style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;background:#25D366;color:#fff;border-radius:10px;padding:12px;font-weight:700;font-size:14px;border:none;cursor:pointer">
+               📲 WhatsApp
+             </button>
+             <a id="btnDescargar" href="${d.ticketImg}" download="ticket-${d.nombre.replace(/\s/g,'-')}.jpg"
+               style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;background:#1a1a1a;border:1px solid #333;color:#aaa;border-radius:10px;padding:12px;font-weight:700;font-size:14px;text-decoration:none">
+               ⬇️ Descargar
+             </a>
+           </div>`
         :`<div style="color:#555;font-size:13px;margin-bottom:10px">No hay foto del ticket aún.</div>`}
       <div class="upload-area" id="ticketUpload" style="margin-bottom:8px">
         <div style="font-size:24px">📷</div>
@@ -483,13 +501,26 @@ function bindDetalle(){
     btn.onclick=()=>dbEstado(state.selectedId,btn.dataset.fbkey,btn.dataset.estado);
   });
 
-  // WhatsApp
+  // WhatsApp — compartir foto + nombre con Web Share API
   const btnWa=document.getElementById("btnWhatsapp");
   if(btnWa&&d){
-    const agenciaLabel=d.agencia==="Otra..."?(d.agenciaCustom||"Otra"):d.agencia;
-    const texto=`📦 *Despacho Colderman*\n👤 ${d.nombre}${d.rut?" | RUT: "+d.rut:""}${d.nDoc?" | N°"+d.nDoc:""}\n🚚 ${agenciaLabel||""}${d.direccionDestino?" - "+d.direccionDestino:""}${d.bultos?" | "+d.bultos+" bulto(s)":""}\n📅 ${d.fecha}`;
-    btnWa.href="https://api.whatsapp.com/send?text="+encodeURIComponent(texto);
-    btnWa.target="_blank";
+    btnWa.onclick=async(e)=>{
+      e.preventDefault();
+      try{
+        if(d.ticketImg && navigator.share){
+          const res=await fetch(d.ticketImg);
+          const blob=await res.blob();
+          const file=new File([blob],"ticket.jpg",{type:blob.type});
+          await navigator.share({text:d.nombre,files:[file]});
+        } else if(navigator.share){
+          await navigator.share({text:d.nombre});
+        } else {
+          window.open("https://api.whatsapp.com/send?text="+encodeURIComponent(d.nombre),"_blank");
+        }
+      }catch(err){
+        if(err.name!=="AbortError") window.open("https://api.whatsapp.com/send?text="+encodeURIComponent(d.nombre),"_blank");
+      }
+    };
   }
 
   // Subir ticket por archivo
