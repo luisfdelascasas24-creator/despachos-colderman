@@ -323,12 +323,7 @@ function renderNuevo(){
         ${showAgenciaCustom?`<div class="field"><label>¿Cuál agencia?</label>
           <input id="fAgenciaCustom" value="${f.agenciaCustom}" placeholder="Nombre de la agencia" /></div>`:""}
         <div class="field"><label>Dirección / sucursal de destino</label>
-          <input id="fDireccion" value="${f.direccionDestino}" placeholder="Ej: Sucursal Starken Talca" /></div>
-        <div class="field"><label>Región de destino</label>
-          <select id="fRegion">
-            <option value="">Seleccionar región...</option>
-            ${REGIONES.map(r=>`<option ${f.region===r?"selected":""}>${r}</option>`).join("")}
-          </select></div>
+          <input id="fDireccion" value="${f.direccionDestino}" placeholder="Ej: Sucursal Starken Talca, Av. O'Higgins 123" /></div>
       `:`<div style="background:#1a1a1a;border-radius:10px;padding:12px;margin-bottom:14px;font-size:13px;color:#888">
           ${f.destino==="oficina"?"🏢 El pedido se recibe en oficina.":"🏭 El pedido se recoge en bodega."}
         </div>`}
