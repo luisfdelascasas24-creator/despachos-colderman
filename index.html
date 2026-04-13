@@ -86,7 +86,7 @@ const emptyForm=()=>({
   imgPreview:null,extracting:false,extractError:""
 });
 
-let state={despachos:[],view:"lista",selectedId:null,filtro:"todos",busqueda:"",form:emptyForm(),useFirebase:false};
+let state={despachos:[],view:"lista",selectedId:null,filtro:"todos",busqueda:"",filtroDia:"todos",form:emptyForm(),useFirebase:false};
 
 // ── FIREBASE ──────────────────────────────────────────────────────────────────
 function initStorage(){
@@ -162,6 +162,9 @@ async function handleFile(file){
       }
       console.log("=== TEXTO OCR ===\n" + text);
       state.form.nombre = nombre;
+      // N° documento — busca "N°", "N.°", "Nº", "COTIZACION", "FACTURA"
+      const nDocMatch = text.match(/(?:N[°º\.]+|COTIZACI[OÓ]N\s*N[°º]?|FACTURA\s*N[°º]?)\s*[:\s]*(\d{3,6})/i);
+      state.form.nDoc = nDocMatch ? nDocMatch[1] : "";
       // RUT — busca línea con RUT: primero, luego cualquier RUT en el texto
       let rut = "";
       for (let i = 0; i < lines.length; i++) {
@@ -194,6 +197,7 @@ function guardar(){
   dbGuardar({
     id:Date.now(),ts:Date.now(),
     nombre:f.nombre.trim(),rut:f.rut.trim(),
+    nDoc:f.nDoc.trim(),bultos:f.bultos,
     tipoCompra:f.tipoCompra,
     empresaNacional:f.empresaNacional,
     empresaNacionalCustom:f.empresaNacionalCustom.trim(),
@@ -218,31 +222,37 @@ function render(){
 // ── LISTA ─────────────────────────────────────────────────────────────────────
 function renderLista(){
   const c=counts();
+  const hoy=new Date().toLocaleDateString("es-CL");
+  const pendientesAtrasados=state.despachos.filter(d=>d.estado==="pendiente"&&d.fecha!==hoy);
+  
   const filtrados = (() => {
     let arr = state.filtro==="todos" ? state.despachos : state.despachos.filter(d=>d.estado===state.filtro);
+    if (state.filtroDia==="hoy") arr=arr.filter(d=>d.fecha===hoy);
     if (state.busqueda.trim()) {
       const q = state.busqueda.toLowerCase().trim();
-      arr = arr.filter(d => [d.nombre,d.rut,d.agencia,d.agenciaCustom,d.direccionDestino,d.empresaNacional,d.empresaNacionalCustom,d.notas]
+      arr = arr.filter(d => [d.nombre,d.rut,d.nDoc,d.agencia,d.agenciaCustom,d.direccionDestino,d.empresaNacional,d.empresaNacionalCustom,d.notas]
         .some(v => v && v.toLowerCase().includes(q)));
     }
     return arr;
   })();
+
   const cards=filtrados.length===0
     ?`<div class="empty">${state.despachos.length===0?"No hay despachos. Agrega el primero.":"Sin resultados."}</div>`
     :filtrados.map(d=>`
-      <div class="card" data-id="${d.id}">
+      <div class="card" data-id="${d.id}" style="border-color:${d.estado==="pendiente"&&d.fecha!==hoy?"#ef444455":"#2a2a2a"}">
         <div style="display:flex;justify-content:space-between;align-items:flex-start">
           <div style="flex:1;min-width:0">
-            <div style="font-weight:600;font-size:15px;margin-bottom:3px">${d.nombre}</div>
-            ${d.rut?`<div style="font-size:12px;color:#666">RUT: ${d.rut}</div>`:""}
+            <div style="font-weight:600;font-size:15px;margin-bottom:3px">${d.nombre}${d.nDoc?` <span style="font-size:12px;color:#666">#${d.nDoc}</span>`:""}</div>
+            ${d.rut?`<div style="font-size:12px;color:#666">RUT: ${d.rut}${d.bultos?` · 📦 ${d.bultos} bulto${d.bultos>1?"s":""}`:""}</div>`:""}
             <div style="font-size:12px;color:#666;margin-top:4px">${getResumen(d)}</div>
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;margin-left:8px">
             ${badge(d.estado)}
-            <span style="font-size:11px;color:#555">${d.fecha}</span>
+            <span style="font-size:11px;color:${d.estado==="pendiente"&&d.fecha!==hoy?"#ef4444":"#555"}">${d.fecha}</span>
           </div>
         </div>
       </div>`).join("");
+
   return`
     <div class="header">
       <div>
@@ -251,6 +261,10 @@ function renderLista(){
       </div>
       <button class="btn-primary" id="btnNuevo">+ Nuevo</button>
     </div>
+    ${pendientesAtrasados.length>0?`
+    <div style="background:#2a0000;border-left:3px solid #ef4444;padding:10px 16px;font-size:13px;color:#ef4444;display:flex;align-items:center;gap:8px">
+      ⚠️ Tienes <strong>${pendientesAtrasados.length}</strong> despacho${pendientesAtrasados.length>1?"s":""} pendiente${pendientesAtrasados.length>1?"s":""} de días anteriores
+    </div>`:""}
     <div class="counters">
       ${Object.entries(ESTADOS).map(([k,v])=>`
         <div class="counter" id="cnt-${k}" style="border-color:${state.filtro===k?v.color:"#2a2a2a"};background:${state.filtro===k?v.bg:"#1a1a1a"}">
@@ -258,12 +272,15 @@ function renderLista(){
           <div class="lbl">${v.label}</div>
         </div>`).join("")}
     </div>
-    <div style="padding:10px 16px 0;max-width:600px;margin:0 auto">
-      <div style="position:relative">
+    <div style="padding:10px 16px 0;max-width:600px;margin:0 auto;display:flex;gap:8px;align-items:center">
+      <div style="position:relative;flex:1">
         <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#555;font-size:16px">🔍</span>
-        <input id="searchInput" value="${state.busqueda||""}" placeholder="Buscar por nombre, RUT, agencia, destino..." 
+        <input id="searchInput" value="${state.busqueda||""}" placeholder="Buscar nombre, RUT, N° doc..." 
           style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:10px;padding:10px 12px 10px 36px;color:#fff;font-size:14px;outline:none" />
       </div>
+      <button id="btnHoy" style="background:${state.filtroDia==="hoy"?"#e07b00":"#1a1a1a"};border:1px solid ${state.filtroDia==="hoy"?"#e07b00":"#333"};color:${state.filtroDia==="hoy"?"#fff":"#888"};border-radius:10px;padding:10px 14px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">
+        📅 Hoy
+      </button>
     </div>
     <div class="page">${cards}</div>`;
 }
@@ -272,6 +289,7 @@ function bindLista(){
   Object.keys(ESTADOS).forEach(k=>{document.getElementById("cnt-"+k).onclick=()=>setState({filtro:state.filtro===k?"todos":k});});
   document.querySelectorAll(".card[data-id]").forEach(el=>{el.onclick=()=>setState({view:"detalle",selectedId:+el.dataset.id});});
   document.getElementById("searchInput").oninput=e=>{state.busqueda=e.target.value;render();setTimeout(bindLista,0);};
+  document.getElementById("btnHoy").onclick=()=>setState({filtroDia:state.filtroDia==="hoy"?"todos":"hoy"});
 }
 
 // ── NUEVO ─────────────────────────────────────────────────────────────────────
@@ -302,8 +320,14 @@ function renderNuevo(){
       <!-- DATOS CLIENTE -->
       <div class="field"><label>Nombre del cliente / empresa *</label>
         <input id="fNombre" value="${f.nombre}" placeholder="Extraído o escribe aquí" /></div>
-      <div class="field"><label>RUT</label>
-        <input id="fRut" value="${f.rut}" placeholder="Ej: 12.345.678-9" /></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="field"><label>RUT</label>
+          <input id="fRut" value="${f.rut}" placeholder="Ej: 12.345.678-9" /></div>
+        <div class="field"><label>N° Cotización / Factura</label>
+          <input id="fNDoc" value="${f.nDoc}" placeholder="Ej: 5065" /></div>
+      </div>
+      <div class="field"><label>Cantidad de bultos</label>
+        <input id="fBultos" type="number" min="1" value="${f.bultos}" placeholder="Ej: 3" /></div>
 
       <!-- TIPO COMPRA -->
       <div class="section-sep">Tipo de compra</div>
@@ -356,6 +380,8 @@ function bindNuevo(){
   document.getElementById("fileInput").onchange=e=>handleFile(e.target.files[0]);
   document.getElementById("fNombre").oninput=e=>{state.form.nombre=e.target.value;};
   document.getElementById("fRut").oninput=e=>{state.form.rut=e.target.value;};
+  document.getElementById("fNDoc").oninput=e=>{state.form.nDoc=e.target.value;};
+  document.getElementById("fBultos").oninput=e=>{state.form.bultos=e.target.value;};
   document.getElementById("tabImport").onclick=()=>{state.form.tipoCompra="importacion";re();};
   document.getElementById("tabNacional").onclick=()=>{state.form.tipoCompra="nacional";re();};
   document.getElementById("tabProvincia").onclick=()=>{state.form.destino="provincia";re();};
