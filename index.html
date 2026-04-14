@@ -42,6 +42,7 @@
       --accent2:#f59e0b;
       --ok:#10b981;
       --danger:#ef4444;
+      --blue:#60a5fa;
     }
     html,body{background:var(--bg);color:var(--text);min-height:100vh}
     body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
@@ -91,7 +92,7 @@
     .counter .num{font-size:22px;font-weight:700}
     .counter .lbl{font-size:10px;color:var(--muted);margin-top:2px}
     .badge{border-radius:20px;padding:3px 10px;font-size:12px;font-weight:600;border:1px solid;white-space:nowrap}
-    .page{max-width:680px;margin:0 auto;padding:16px}
+    .page{max-width:720px;margin:0 auto;padding:16px}
     .row{display:flex;gap:8px;margin-bottom:8px}
     .row .lbl{font-size:13px;color:var(--muted2);min-width:96px;flex-shrink:0}
     .row .val{font-size:13px;color:#ddd;word-break:break-word}
@@ -124,7 +125,7 @@
     .chip.active{background:#2a1f00;border-color:var(--accent);color:var(--accent2)}
     .layout{display:flex;gap:12px;align-items:flex-start;max-width:1000px;margin:0 auto;padding:12px 16px 16px}
     .layout-main{flex:1;min-width:0}
-    .layout-side{width:180px;flex-shrink:0;display:flex;flex-direction:column;gap:8px}
+    .layout-side{width:190px;flex-shrink:0;display:flex;flex-direction:column;gap:8px}
     .summary-title{font-size:11px;color:#555;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px}
     .resumen-item{
       background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 10px;cursor:pointer;display:flex;justify-content:space-between;align-items:center
@@ -142,6 +143,16 @@
       min-width:220px;max-width:90vw;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,.35)
     }
     .kdb{background:#252525;border:1px solid #333;border-radius:4px;padding:1px 5px}
+    .gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px}
+    .thumb{
+      background:#141414;border:1px solid #2c2c2c;border-radius:12px;padding:6px;cursor:pointer
+    }
+    .thumb img{
+      width:100%;height:100px;object-fit:cover;border-radius:8px;display:block
+    }
+    .thumb-label{
+      font-size:11px;color:#888;margin-top:6px;text-align:center
+    }
     @media (max-width:860px){
       .dashboard-grid{grid-template-columns:repeat(2,1fr)}
       .layout{flex-direction:column}
@@ -151,7 +162,6 @@
       .header{padding:12px}
       .btn-primary,.btn-secondary,.btn-danger,.btn-ghost{padding:10px 12px;font-size:13px}
       .dashboard-grid,.counters,.filters-wrap,.layout{padding-left:12px;padding-right:12px}
-      .counters{grid-template-columns:1fr 1fr 1fr}
       .page{padding:12px}
     }
   </style>
@@ -161,7 +171,7 @@
 
 <script>
 const REGIONES=["Arica y Parinacota","Tarapacá","Antofagasta","Atacama","Coquimbo","Valparaíso","Región Metropolitana","O'Higgins","Maule","Ñuble","Biobío","La Araucanía","Los Ríos","Los Lagos","Aysén","Magallanes"];
-const AGENCIAS=["Starken","Varmont","PDQ","Chevallier","FedEx","Chilexpress","RapidCargo","Uber Envíos","Infante","Otra..."];
+const AGENCIAS=["Starken","Varmont","PDQ","Chevallier","FedEx","Chilexpress","RapidCargo","Uber Envíos","Infante","El Arriero","Otra..."];
 const EMPRESAS_NACIONAL=["Blescom","American Air","Esmeralda","Otra..."];
 const ESTADOS={
   pendiente:{label:"Pendiente",color:"#f59e0b",bg:"#2a1f00"},
@@ -191,6 +201,7 @@ const emptyForm=()=>({
   extractError:"",
   extractSuccess:"",
   statusMessage:"",
+  ticketImgs:[],
   ticketImg:"",
   fecha:"",
   estado:"pendiente",
@@ -238,18 +249,6 @@ function normalizeText(v){
     .trim();
 }
 
-function formatDateCL(date){
-  return new Date(date).toLocaleDateString("es-CL");
-}
-
-function formatDateInputFromCL(clDate){
-  if(!clDate) return "";
-  const parts=clDate.split("/");
-  if(parts.length!==3) return "";
-  const [dd,mm,yyyy]=parts;
-  return `${yyyy}-${mm.padStart(2,"0")}-${dd.padStart(2,"0")}`;
-}
-
 function slugify(v){
   return String(v||"archivo")
     .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
@@ -258,132 +257,98 @@ function slugify(v){
     .slice(0,60) || "archivo";
 }
 
-function nowStamp(){
-  return Date.now();
-}
+function nowStamp(){ return Date.now(); }
 
 function addHistory(despacho,tipo,nota=""){
   const historial=Array.isArray(despacho.historial)?despacho.historial:[];
-  return [
-    {
-      ts:nowStamp(),
-      fecha:new Date().toLocaleString("es-CL"),
-      tipo,
-      nota
-    },
-    ...historial
-  ];
+  return [{
+    ts:nowStamp(),
+    fecha:new Date().toLocaleString("es-CL"),
+    tipo,
+    nota
+  }, ...historial];
 }
 
-// ── FIREBASE ──────────────────────────────────────────────────────────────────
-function initStorage(){
-  if(window._firebaseReady && window._db){
-    state.useFirebase=true;
-    window._db.ref("despachos").on("value",snap=>{
-      const val=snap.val();
-      state.despachos=val?Object.entries(val).map(([k,v])=>({...v,fbKey:k})):[];
-      state.despachos.sort((a,b)=>(b.ts||0)-(a.ts||0));
-      render();
-    });
-  } else {
-    try{
-      state.despachos=JSON.parse(localStorage.getItem("dcold")||"[]");
-    }catch{
-      state.despachos=[];
+function openImageOverlay(src){
+  const overlay=document.createElement("div");
+  overlay.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px";
+  overlay.innerHTML=`<img src="${src}" style="max-width:100%;max-height:100%;border-radius:12px" /><button style="position:fixed;top:16px;right:16px;background:none;border:none;color:#fff;font-size:30px;cursor:pointer">✕</button>`;
+  overlay.onclick=()=>overlay.remove();
+  document.body.appendChild(overlay);
+}
+
+function sanitizeName(v){
+  return String(v||"")
+    .replace(/\bFECHA\s+EMISI[OÓ]N\b.*$/i,"")
+    .replace(/\bFECHA\b.*$/i,"")
+    .replace(/\bRUT\b.*$/i,"")
+    .replace(/\bGIRO\b.*$/i,"")
+    .replace(/\bDIRECCI[OÓ]N\b.*$/i,"")
+    .replace(/\bCOMUNA\b.*$/i,"")
+    .replace(/\bCIUDAD\b.*$/i,"")
+    .replace(/\bFORMA\s+DE\s+PAGO\b.*$/i,"")
+    .replace(/\bFECHA\s+VENCIMIENTO\b.*$/i,"")
+    .replace(/[|]/g," ")
+    .replace(/\s{2,}/g," ")
+    .trim();
+}
+
+function inferNombre(lines,text){
+  let nombre="";
+
+  for(let i=0;i<lines.length;i++){
+    const l=lines[i].toUpperCase();
+
+    if(/SE[NÑ]OR(?:ES)?|SENOR(?:ES)?|CLIENTE|DESTINATARIO|A NOMBRE|RAZON SOCIAL/.test(l)){
+      let posible="";
+      const partes=lines[i].split(/:\s*/);
+
+      if(partes.length>1 && partes[1].trim().length>2){
+        posible=partes.slice(1).join(":").trim();
+      } else if(i+1<lines.length){
+        posible=lines[i+1].trim();
+      }
+
+      posible=sanitizeName(posible);
+
+      if(posible.length>4){
+        nombre=posible;
+        break;
+      }
     }
-    render();
   }
-}
-function saveLocal(){
-  localStorage.setItem("dcold",JSON.stringify(state.despachos));
-}
-function dbGuardar(d){
-  if(state.useFirebase){
-    const payload={...d};
-    delete payload.fbKey;
-    window._db.ref("despachos").push(payload);
-  }else{
-    state.despachos=[d,...state.despachos];
-    saveLocal();
-    render();
+
+  if(!nombre){
+    const likely=lines.find(x=>{
+      const clean=x.toUpperCase();
+      return /^[A-ZÁÉÍÓÚÑ0-9 .&-]{6,}$/.test(clean) &&
+        !/(FACTURA|BOLETA|COTIZACION|COTIZACIÓN|RUT|FECHA|TOTAL|NETO|IVA|DIRECCION|DIRECCIÓN|FORMA DE PAGO|GIRO)/i.test(clean);
+    });
+
+    if(likely){
+      nombre=sanitizeName(likely);
+    }
   }
-}
-function dbActualizar(d){
-  if(state.useFirebase && d.fbKey){
-    const payload={...d};
-    delete payload.fbKey;
-    window._db.ref("despachos/"+d.fbKey).set(payload);
-  }else{
-    state.despachos=state.despachos.map(x=>x.id===d.id?d:x);
-    saveLocal();
-    render();
-  }
-}
-function dbEstado(id,fbKey,estado){
-  const d=state.despachos.find(x=>x.id===id);
-  if(!d) return;
-  const nuevo={
-    ...d,
-    estado,
-    historial:addHistory(d,"Estado cambiado",estado)
-  };
-  if(state.useFirebase && fbKey){
-    const payload={...nuevo};
-    delete payload.fbKey;
-    window._db.ref("despachos/"+fbKey).set(payload);
-  }else{
-    state.despachos=state.despachos.map(x=>x.id===id?nuevo:x);
-    saveLocal();
-    render();
-  }
-  showToast("Estado actualizado");
-}
-function dbEliminar(id,fbKey){
-  if(state.useFirebase && fbKey){
-    window._db.ref("despachos/"+fbKey).remove();
-  }else{
-    state.despachos=state.despachos.filter(d=>d.id!==id);
-    saveLocal();
-  }
-  setState({view:"lista",selectedId:null});
-  showToast("Despacho eliminado");
+
+  return nombre;
 }
 
-// ── HELPERS ───────────────────────────────────────────────────────────────────
-function setState(p){
-  if(window._pasteCleanup){window._pasteCleanup();window._pasteCleanup=null;}
-  if(window._pasteNuevoCleanup){window._pasteNuevoCleanup();window._pasteNuevoCleanup=null;}
-  Object.assign(state,p);
-  render();
+function inferRut(text,lines){
+  let rut="";
+  for(let i=0;i<lines.length;i++){
+    const l=lines[i].toUpperCase();
+    if(/^RUT[:\s]/.test(l)){
+      const m=lines[i].match(/(\d{1,2}(?:\.\d{3}){2}-[\dkK]|\d{7,8}-[\dkK])/);
+      if(m){ rut=m[1]; break; }
+    }
+  }
+  if(!rut){
+    const m=text.match(/\b(\d{1,2}(?:\.\d{3}){2}-[\dkK]|\d{7,8}-[\dkK])\b/);
+    if(m) rut=m[1];
+  }
+  return rut;
 }
-function badge(e){
-  const v=ESTADOS[e]||ESTADOS.pendiente;
-  return `<span class="badge" style="color:${v.color};border-color:${v.color};background:${v.bg}">${v.label}</span>`;
-}
-function counts(){
-  return {
-    pendiente:state.despachos.filter(d=>d.estado==="pendiente").length,
-    entregado:state.despachos.filter(d=>d.estado==="entregado").length,
-    falta_doc:state.despachos.filter(d=>d.estado==="falta_doc").length
-  };
-}
-function dashboardData(){
-  const hoy=new Date().toLocaleDateString("es-CL");
-  return {
-    total:state.despachos.length,
-    hoy:state.despachos.filter(d=>d.fecha===hoy).length,
-    sinTicket:state.despachos.filter(d=>d.estado==="entregado" && !d.ticketImg).length,
-    atrasados:state.despachos.filter(d=>d.estado==="pendiente" && d.fecha!==hoy).length
-  };
-}
-function getAgencyLabel(d){
-  if(d.destino==="bodega") return "🏭 Bodega";
-  if(d.destino==="oficina") return "🏢 Oficina";
-  return d.agencia==="Otra..."?(d.agenciaCustom||"Otra"):d.agencia;
-}
-function getEmpresaLabel(d){
-  return d.empresaNacional==="Otra..."?(d.empresaNacionalCustom||"Otra"):d.empresaNacional;
-}
+
 function inferDocNumber(text){
   const patterns=[
     /(cotizaci[oó]n|cotizacion)[^\d]{0,12}(\d{3,12})/i,
@@ -397,89 +362,117 @@ function inferDocNumber(text){
   }
   return "";
 }
-function inferTracking(text){
-  const clean=text.replace(/\s+/g," ");
-  const patterns=[
-    /\b(?:tracking|seguimiento|gu[ií]a|guia|awb|n[úu]mero de env[ií]o|n[úu]mero de seguimiento)[^\d]{0,14}([A-Z0-9\-]{6,24})\b/i,
-    /\b([A-Z]{2,6}\-?\d{6,18})\b/,
-    /\b(\d{8,18})\b/
-  ];
-  for(const re of patterns){
-    const m=clean.match(re);
-    if(m){
-      const val=(m[1]||"").trim();
-      if(val.length>=6) return val;
-    }
+
+function cleanDigits(v){
+  return String(v||"").replace(/[^\d]/g,"");
+}
+
+function detectTrackingByAgency(text, agency){
+  const raw=String(text||"");
+  const compact=raw.replace(/\s+/g," ").trim();
+  const upper=compact.toUpperCase();
+  const justDigits=(s)=>cleanDigits(s);
+
+  function matchDigits(re){
+    const m=upper.match(re);
+    return m ? justDigits(m[1]||m[0]) : "";
   }
+
+  const ag=String(agency||"").toLowerCase();
+
+  if(ag.includes("starken")){
+    let v=matchDigits(/ORDEN\s+DE\s+FLETE(?:\s+NOMINATIVA)?\s*(?:N\.?|N[°º])?\s*([0-9.,]+)/i);
+    if(v) return v;
+    v=matchDigits(/NUMERO\s+DE\s+ORDEN\s+DE\s+FLETE\s*[:\-]?\s*([0-9.,]+)/i);
+    if(v) return v;
+  }
+
+  if(ag.includes("chevallier")){
+    let v=matchDigits(/(?:^|\s)(\d{10,14})(?:\s|$)/);
+    if(v) return v;
+  }
+
+  if(ag.includes("varmont")){
+    let v=matchDigits(/(?:^|\s)(\d{10,14})(?:\s|$)/);
+    if(v) return v;
+  }
+
+  if(ag.includes("pdq")){
+    let v=matchDigits(/M\.?R\.?\s*COURIER\s*([0-9]{6,10})/i);
+    if(v) return v;
+    v=matchDigits(/ORDEN\s+DE\s+PICK\s*UP.*?([0-9]{6,10})/i);
+    if(v) return v;
+    v=matchDigits(/(?:^|\s)([0-9]{6,10})(?:\s|$)/);
+    if(v) return v;
+  }
+
+  if(ag.includes("rapid")){
+    let v=matchDigits(/ODF\s*#\s*([0-9]{4,12})/i);
+    if(v) return v;
+    v=matchDigits(/CORR\.?\s*([0-9]{4,12})/i);
+    if(v) return v;
+  }
+
+  if(ag.includes("chilexpress")){
+    let v=matchDigits(/ORDEN\s+DE\s+TRANSPORTE\s*[:\-]?\s*([0-9]{8,16})/i);
+    if(v) return v;
+    v=matchDigits(/NRO\.?\s+DE\s+OPERACION\s*[:\-]?\s*([0-9]{4,12})/i);
+    if(v) return v;
+  }
+
+  if(ag.includes("arriero")){
+    let v=matchDigits(/CARTA\s+DE\s+PORTE\s*(?:N[°º])?\s*([0-9]{5,12})/i);
+    if(v) return v;
+  }
+
+  if(ag.includes("fedex")){
+    let v=matchDigits(/TRK#\s*([0-9 ]{8,20})/i);
+    if(v) return v;
+    v=matchDigits(/NUMERO\s+DE\s+GUIA\s*([0-9 ]{8,20})/i);
+    if(v) return v;
+    v=matchDigits(/N[ÚU]MERO\s+DE\s+GU[IÍ]A\s*([0-9 ]{8,20})/i);
+    if(v) return v;
+  }
+
+  if(ag.includes("el arriero")){
+    let v=matchDigits(/CARTA\s+DE\s+PORTE\s*(?:N[°º])?\s*([0-9]{5,12})/i);
+    if(v) return v;
+  }
+
+  // Fallback general
+  let v=matchDigits(/(?:TRK#|TRACKING|SEGUIMIENTO|GUIA|GU[IÍ]A|N[ÚU]MERO\s+DE\s+GUIA|NUMERO\s+DE\s+GUIA|ORDEN\s+DE\s+TRANSPORTE|ORDEN\s+DE\s+FLETE)\s*[:#N°º.-]*\s*([A-Z0-9 .,-]{5,24})/i);
+  if(v) return v;
+
+  // Último recurso: secuencia larga de dígitos
+  const all=[...upper.matchAll(/\b\d{6,16}\b/g)].map(x=>x[0]);
+  if(all.length){
+    all.sort((a,b)=>b.length-a.length);
+    return all[0];
+  }
+
   return "";
 }
-function inferRut(text,lines){
-  let rut="";
-  for(let i=0;i<lines.length;i++){
-    const l=lines[i].toUpperCase();
-    if(/^RUT[:\s]/.test(l)){
-      const m=lines[i].match(/(\d{1,2}(?:\.\d{3}){2}-[\dkK]|\d{7,8}-[\dkK])/);
-      if(m){rut=m[1];break;}
-    }
-  }
-  if(!rut){
-    const m=text.match(/\b(\d{1,2}(?:\.\d{3}){2}-[\dkK]|\d{7,8}-[\dkK])\b/);
-    if(m) rut=m[1];
-  }
-  return rut;
-}
-function inferNombre(lines,text){
-  let nombre="";
-  for(let i=0;i<lines.length;i++){
-    const l=lines[i].toUpperCase();
-    if(/SE[NÑ]OR(?:ES)?|SENOR(?:ES)?|CLIENTE|DESTINATARIO|A NOMBRE|RAZON SOCIAL/.test(l)){
-      const partes=lines[i].split(/:\s*/);
-      if(partes.length>1 && partes[1].trim().length>2){
-        nombre=partes.slice(1).join(":").trim();
-      }else if(i+1<lines.length){
-        nombre=lines[i+1].trim();
-      }
-      if(nombre) break;
-    }
-  }
-  if(!nombre){
-    const likely=lines.find(x=>/^[A-ZÁÉÍÓÚÑ0-9 .&-]{6,}$/.test(x) && !/(FACTURA|BOLETA|COTIZACION|COTIZACIÓN|RUT|FECHA|TOTAL|NETO|IVA)/i.test(x));
-    if(likely) nombre=likely;
-  }
-  return nombre;
-}
-async function ocrImage(file,lang="spa"){
-  const {createWorker}=Tesseract;
-  const worker=await createWorker(lang);
-  const {data:{text}}=await worker.recognize(file);
-  await worker.terminate();
-  return text;
-}
-async function extractDocData(file){
-  const text=await ocrImage(file,"spa");
-  const lines=text.split("\n").map(l=>l.trim()).filter(Boolean);
-  return {
-    text,
-    nombre:inferNombre(lines,text),
-    rut:inferRut(text,lines),
-    nDoc:inferDocNumber(text)
-  };
-}
-async function extractTicketData(file){
-  const text=await ocrImage(file,"spa");
-  return {
-    text,
-    tracking:inferTracking(text)
-  };
-}
-function filenameForTicket(d){
+
+function filenameForTicket(d,index=0){
   const base=slugify(d.nombre||"cliente");
   const fecha=slugify((d.fecha||new Date().toLocaleDateString("es-CL")).replace(/\//g,"-"));
   const track=slugify(d.tracking||"");
-  return track?`${base}-${fecha}-${track}.jpg`:`${base}-${fecha}.jpg`;
+  const suf=index>0?`-${index+1}`:"";
+  return track?`${base}-${fecha}-${track}${suf}.jpg`:`${base}-${fecha}${suf}.jpg`;
 }
+
+function getAgencyLabel(d){
+  if(d.destino==="bodega") return "🏭 Bodega";
+  if(d.destino==="oficina") return "🏢 Oficina";
+  return d.agencia==="Otra..."?(d.agenciaCustom||"Otra"):d.agencia;
+}
+
+function getEmpresaLabel(d){
+  return d.empresaNacional==="Otra..."?(d.empresaNacionalCustom||"Otra"):d.empresaNacional;
+}
+
 function exportCSV(){
-  const head=["Nombre","RUT","Documento","Tracking","Estado","Fecha","Tipo","Destino","Agencia","Dirección","Notas"];
+  const head=["Nombre","RUT","Documento","Tracking","Estado","Fecha","Tipo","Destino","Agencia","Dirección","Notas","Tickets"];
   const rows=state.despachos.map(d=>[
     `"${String(d.nombre||"").replace(/"/g,'""')}"`,
     `"${String(d.rut||"").replace(/"/g,'""')}"`,
@@ -491,7 +484,8 @@ function exportCSV(){
     `"${String(d.destino||"").replace(/"/g,'""')}"`,
     `"${String(getAgencyLabel(d)||"").replace(/"/g,'""')}"`,
     `"${String(d.direccionDestino||"").replace(/"/g,'""')}"`,
-    `"${String(d.notas||"").replace(/"/g,'""')}"`
+    `"${String(d.notas||"").replace(/"/g,'""')}"`,
+    `"${Array.isArray(d.ticketImgs)?d.ticketImgs.length:(d.ticketImg?1:0)}"`
   ].join(","));
   const csv="\uFEFF"+head.join(",")+"\n"+rows.join("\n");
   const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});
@@ -505,6 +499,7 @@ function exportCSV(){
   URL.revokeObjectURL(url);
   showToast("CSV exportado");
 }
+
 function findPossibleDuplicate(form){
   const rutN=normalizeText(form.rut);
   const docN=normalizeText(form.nDoc);
@@ -520,9 +515,140 @@ function findPossibleDuplicate(form){
   });
 }
 
-// ── EXTRACCIÓN OCR DOC ────────────────────────────────────────────────────────
+function dashboardData(){
+  const hoy=new Date().toLocaleDateString("es-CL");
+  return {
+    total:state.despachos.length,
+    hoy:state.despachos.filter(d=>d.fecha===hoy).length,
+    sinTicket:state.despachos.filter(d=>d.estado==="entregado" && !(Array.isArray(d.ticketImgs)?d.ticketImgs.length:d.ticketImg?1:0)).length,
+    atrasados:state.despachos.filter(d=>d.estado==="pendiente" && d.fecha!==hoy).length
+  };
+}
+
+// ── FIREBASE ──────────────────────────────────────────────────────────────────
+function initStorage(){
+  if(window._firebaseReady && window._db){
+    state.useFirebase=true;
+    window._db.ref("despachos").on("value",snap=>{
+      const val=snap.val();
+      state.despachos=val?Object.entries(val).map(([k,v])=>({
+        ...v,
+        fbKey:k,
+        ticketImgs:Array.isArray(v.ticketImgs)?v.ticketImgs:(v.ticketImg?[v.ticketImg]:[])
+      })):[];
+      state.despachos.sort((a,b)=>(b.ts||0)-(a.ts||0));
+      render();
+    });
+  } else {
+    try{
+      const local=JSON.parse(localStorage.getItem("dcold")||"[]");
+      state.despachos=Array.isArray(local)?local.map(v=>({
+        ...v,
+        ticketImgs:Array.isArray(v.ticketImgs)?v.ticketImgs:(v.ticketImg?[v.ticketImg]:[])
+      })):[];
+    }catch{
+      state.despachos=[];
+    }
+    render();
+  }
+}
+
+function saveLocal(){
+  localStorage.setItem("dcold",JSON.stringify(state.despachos));
+}
+
+function dbGuardar(d){
+  const payload={
+    ...d,
+    ticketImgs:Array.isArray(d.ticketImgs)?d.ticketImgs:(d.ticketImg?[d.ticketImg]:[])
+  };
+  payload.ticketImg=payload.ticketImgs[0]||"";
+
+  if(state.useFirebase){
+    const out={...payload};
+    delete out.fbKey;
+    window._db.ref("despachos").push(out);
+  }else{
+    state.despachos=[payload,...state.despachos];
+    saveLocal();
+    render();
+  }
+}
+
+function dbActualizar(d){
+  const payload={
+    ...d,
+    ticketImgs:Array.isArray(d.ticketImgs)?d.ticketImgs:(d.ticketImg?[d.ticketImg]:[])
+  };
+  payload.ticketImg=payload.ticketImgs[0]||"";
+
+  if(state.useFirebase && d.fbKey){
+    const out={...payload};
+    delete out.fbKey;
+    window._db.ref("despachos/"+d.fbKey).set(out);
+  }else{
+    state.despachos=state.despachos.map(x=>x.id===d.id?payload:x);
+    saveLocal();
+    render();
+  }
+}
+
+function dbEstado(id,fbKey,estado){
+  const d=state.despachos.find(x=>x.id===id);
+  if(!d) return;
+  const nuevo={
+    ...d,
+    estado,
+    historial:addHistory(d,"Estado cambiado",estado)
+  };
+  dbActualizar(nuevo);
+  showToast("Estado actualizado");
+}
+
+function dbEliminar(id,fbKey){
+  if(state.useFirebase && fbKey){
+    window._db.ref("despachos/"+fbKey).remove();
+  }else{
+    state.despachos=state.despachos.filter(d=>d.id!==id);
+    saveLocal();
+  }
+  setState({view:"lista",selectedId:null});
+  showToast("Despacho eliminado");
+}
+
+// ── HELPERS GENERALES ────────────────────────────────────────────────────────
+function setState(p){
+  if(window._pasteCleanup){window._pasteCleanup();window._pasteCleanup=null;}
+  if(window._pasteNuevoCleanup){window._pasteNuevoCleanup();window._pasteNuevoCleanup=null;}
+  Object.assign(state,p);
+  render();
+}
+
+function badge(e){
+  const v=ESTADOS[e]||ESTADOS.pendiente;
+  return `<span class="badge" style="color:${v.color};border-color:${v.color};background:${v.bg}">${v.label}</span>`;
+}
+
+function counts(){
+  return {
+    pendiente:state.despachos.filter(d=>d.estado==="pendiente").length,
+    entregado:state.despachos.filter(d=>d.estado==="entregado").length,
+    falta_doc:state.despachos.filter(d=>d.estado==="falta_doc").length
+  };
+}
+
+async function ocrImage(file,lang="spa"){
+  const {createWorker}=Tesseract;
+  const worker=await createWorker(lang);
+  const {data:{text}}=await worker.recognize(file);
+  await worker.terminate();
+  return text;
+}
+
+// ── OCR DOCUMENTO ────────────────────────────────────────────────────────────
 async function handleFile(file){
   if(!file) return;
+
   state.form.extractError="";
   state.form.extractSuccess="";
   state.form.extracting=true;
@@ -535,18 +661,27 @@ async function handleFile(file){
     state.form.imgPreview=e.target.result;
     render();
     setTimeout(bindNuevo,0);
+
     try{
-      const data=await extractDocData(file);
-      if(data.nombre) state.form.nombre=data.nombre;
-      if(data.rut) state.form.rut=data.rut;
-      if(data.nDoc) state.form.nDoc=data.nDoc;
+      const text=await ocrImage(file,"spa");
+      const lines=text.split("\n").map(l=>l.trim()).filter(Boolean);
+
+      const nombre=inferNombre(lines,text);
+      const rut=inferRut(text,lines);
+      const nDoc=inferDocNumber(text);
+
+      if(nombre) state.form.nombre=nombre;
+      if(rut) state.form.rut=rut;
+      if(nDoc) state.form.nDoc=nDoc;
+
       state.form.extracting=false;
       state.form.statusMessage="";
-      if(data.nombre || data.rut || data.nDoc){
+
+      if(nombre || rut || nDoc){
         const found=[
-          data.nombre?"nombre":"",
-          data.rut?"RUT":"",
-          data.nDoc?"N° documento":""
+          nombre?"nombre":"",
+          rut?"RUT":"",
+          nDoc?"N° documento":""
         ].filter(Boolean).join(", ");
         state.form.extractSuccess=`✅ Datos encontrados: ${found}`;
       }else{
@@ -558,19 +693,23 @@ async function handleFile(file){
       state.form.statusMessage="";
       state.form.extractError="No se pudo extraer. Rellena manualmente.";
     }
+
     render();
     setTimeout(bindNuevo,0);
   };
+
   reader.readAsDataURL(file);
 }
 
 // ── GUARDAR ───────────────────────────────────────────────────────────────────
 function guardar(){
   const f=state.form;
+
   if(!f.nombre.trim()){
     showToast("Falta el nombre del cliente");
     return;
   }
+
   if(f.destino==="provincia" && !f.agencia){
     showToast("Selecciona una agencia para provincia");
     return;
@@ -583,11 +722,12 @@ function guardar(){
   }
 
   const existe=state.despachos.find(d=>d.id===f.id);
+
   const base={
     id:existe?f.id:Date.now(),
     fbKey:existe?(f.fbKey||existe.fbKey||""):(f.fbKey||""),
     ts:Date.now(),
-    nombre:f.nombre.trim(),
+    nombre:sanitizeName(f.nombre.trim()),
     rut:f.rut.trim(),
     nDoc:(f.nDoc||"").trim(),
     bultos:f.bultos||"",
@@ -602,12 +742,13 @@ function guardar(){
     direccionDestino:(f.direccionDestino||"").trim(),
     region:f.region||"",
     notas:(f.notas||"").trim(),
-    ticketImg:existe?(f.ticketImg||existe.ticketImg||""):(f.ticketImg||""),
+    ticketImgs:Array.isArray(f.ticketImgs)?f.ticketImgs:(f.ticketImg?[f.ticketImg]:[]),
+    ticketImg:(Array.isArray(f.ticketImgs)?f.ticketImgs[0]:f.ticketImg)||"",
     estado:existe?(f.estado||existe.estado||"pendiente"):"pendiente",
     fecha:existe?(f.fecha||existe.fecha):new Date().toLocaleDateString("es-CL"),
     historial:existe
       ? addHistory(existe,"Despacho editado","Se actualizaron datos del despacho")
-      : addHistory(baseDummy(),"Despacho creado","Creación inicial")
+      : addHistory({historial:[]},"Despacho creado","Creación inicial")
   };
 
   if(existe){
@@ -619,9 +760,6 @@ function guardar(){
   }
 
   setState({view:"lista",form:emptyForm()});
-}
-function baseDummy(){
-  return {historial:[]};
 }
 
 // ── RENDER ────────────────────────────────────────────────────────────────────
@@ -647,7 +785,7 @@ function renderLista(){
   const dash=dashboardData();
   const hoy=new Date().toLocaleDateString("es-CL");
   const pendientesAtrasados=state.despachos.filter(d=>d.estado==="pendiente" && d.fecha!==hoy);
-  const sinTicket=state.despachos.filter(d=>d.estado==="entregado" && !d.ticketImg);
+  const sinTicket=state.despachos.filter(d=>d.estado==="entregado" && !(Array.isArray(d.ticketImgs)?d.ticketImgs.length:d.ticketImg?1:0));
 
   const filtrados=(()=>{
     let arr=state.filtro==="todos"
@@ -669,7 +807,7 @@ function renderLista(){
       arr=arr.filter(d=>d.estado==="pendiente" && d.fecha!==hoy);
     }
     if(state.filtroExtra==="sin_ticket"){
-      arr=arr.filter(d=>d.estado==="entregado" && !d.ticketImg);
+      arr=arr.filter(d=>d.estado==="entregado" && !(Array.isArray(d.ticketImgs)?d.ticketImgs.length:d.ticketImg?1:0));
     }
     if(state.filtroExtra==="nacional"){
       arr=arr.filter(d=>d.tipoCompra==="nacional");
@@ -699,6 +837,8 @@ function renderLista(){
       const empresaLabel=getEmpresaLabel(d);
       const destinoLabel=d.destino==="provincia" ? "📦 Provincia" : d.destino==="oficina" ? "🏢 Oficina" : "🏭 Bodega";
       const atrasado=d.estado==="pendiente" && d.fecha!==hoy;
+      const ticketCount=Array.isArray(d.ticketImgs)?d.ticketImgs.length:(d.ticketImg?1:0);
+
       return `
       <div class="card" data-id="${d.id}" style="border-color:${atrasado?"#ef444455":"#2a2a2a"}">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;gap:8px">
@@ -723,7 +863,7 @@ function renderLista(){
           ${empresaLabel?`<div style="font-size:12px;color:#888">🏭 ${empresaLabel}</div>`:""}
           ${d.direccionDestino?`<div style="font-size:12px;color:#aaa;grid-column:1/-1">📍 ${d.direccionDestino}</div>`:""}
           ${d.bultos?`<div style="font-size:12px;color:#888">📦 ${d.bultos} bulto${+d.bultos>1?"s":""}</div>`:""}
-          ${d.ticketImg?`<div style="font-size:12px;color:#10b981">🧾 Ticket cargado</div>`:`<div style="font-size:12px;color:#666">🧾 Sin ticket</div>`}
+          ${ticketCount?`<div style="font-size:12px;color:#10b981">🧾 ${ticketCount} ticket${ticketCount>1?"s":""}</div>`:`<div style="font-size:12px;color:#666">🧾 Sin ticket</div>`}
           ${d.notas?`<div style="font-size:12px;color:#666;grid-column:1/-1;font-style:italic">💬 ${d.notas}</div>`:""}
         </div>
       </div>`;
@@ -862,7 +1002,7 @@ function bindLista(){
   const x1=document.getElementById("btnLimpiarFecha");
   if(x1) x1.onclick=()=>setState({filtroFecha:""});
 
-  document.getElementById("chipAtrasados").onclick=()=>setState({filtroExtra:state.filtroExtra==="atrasados"?"": "atrasados"});
+  document.getElementById("chipAtrasados").onclick=()=>setState({filtroExtra:state.filtroExtra==="atrasados"?"":"atrasados"});
   document.getElementById("chipSinTicket").onclick=()=>setState({filtroExtra:state.filtroExtra==="sin_ticket"?"":"sin_ticket"});
   document.getElementById("chipImportacion").onclick=()=>setState({filtroExtra:state.filtroExtra==="importacion"?"":"importacion"});
   document.getElementById("chipNacional").onclick=()=>setState({filtroExtra:state.filtroExtra==="nacional"?"":"nacional"});
@@ -1085,6 +1225,7 @@ function renderDetalle(){
   const empresaLabel=getEmpresaLabel(d);
   const agenciaLabel=getAgencyLabel(d);
   const destinoLabel=d.destino==="provincia"?"📦 Envío a provincia":d.destino==="oficina"?"🏢 Recepción en oficina":"🏭 Recojo en bodega";
+  const ticketImgs=Array.isArray(d.ticketImgs)?d.ticketImgs:(d.ticketImg?[d.ticketImg]:[]);
 
   return `
     <div class="header">
@@ -1096,7 +1237,7 @@ function renderDetalle(){
     <div class="page">
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
         <button class="btn-primary" id="btnEditar">✏️ Editar</button>
-        <button class="btn-secondary" id="btnExportOne">⬇️ Descargar ticket</button>
+        <button class="btn-secondary" id="btnShareOnlyText">💬 Texto</button>
       </div>
 
       <div style="background:#1a1a1a;border-radius:16px;padding:20px;margin-bottom:16px;border:1px solid #2a2a2a">
@@ -1111,7 +1252,7 @@ function renderDetalle(){
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
           ${d.nDoc?`<span class="pill">📄 N° ${d.nDoc}</span>`:""}
           ${d.tracking?`<span class="pill">🚚 ${d.tracking}</span>`:""}
-          ${d.ticketImg?`<span class="pill">🧾 Ticket cargado</span>`:`<span class="pill">🧾 Sin ticket</span>`}
+          ${ticketImgs.length?`<span class="pill">🧾 ${ticketImgs.length} ticket${ticketImgs.length>1?"s":""}</span>`:`<span class="pill">🧾 Sin ticket</span>`}
         </div>
 
         <div class="row"><span class="lbl">Tipo</span><span class="val">${d.tipoCompra==="importacion"?"🌏 Importación":"🇨🇱 Compra nacional"}</span></div>
@@ -1125,42 +1266,50 @@ function renderDetalle(){
         <div class="row"><span class="lbl">Ingresado</span><span class="val">${d.fecha||""}</span></div>
       </div>
 
-      <div style="font-size:13px;color:#aaa;font-weight:700;margin:16px 0 10px">DOCUMENTO</div>
-      ${d.docImg
-        ? `<img src="${d.docImg}" id="docMiniatura" style="width:100%;max-height:160px;object-fit:cover;border-radius:12px;margin-bottom:16px;cursor:pointer" title="Toca para ver completo" />`
-        : `<div style="color:#555;font-size:13px;margin-bottom:16px">Sin documento adjunto.</div>`}
+      <div style="font-size:13px;color:#aaa;font-weight:700;margin:16px 0 10px">DOCUMENTO ORIGINAL</div>
+      ${d.docImg?`
+        <div class="gallery">
+          <div class="thumb" data-doc-open="1">
+            <img src="${d.docImg}" alt="Documento" />
+            <div class="thumb-label">Documento</div>
+          </div>
+        </div>
+      `:`<div style="color:#555;font-size:13px;margin-bottom:16px">Sin documento adjunto.</div>`}
 
-      <div style="font-size:13px;color:#aaa;font-weight:700;margin-bottom:10px">CAMBIAR ESTADO</div>
+      <div style="font-size:13px;color:#aaa;font-weight:700;margin:16px 0 10px">CAMBIAR ESTADO</div>
       ${Object.entries(ESTADOS).map(([k,v])=>`
         <button class="btn-estado" data-estado="${k}" data-fbkey="${d.fbKey||""}"
           style="color:${v.color};border-color:${d.estado===k?v.color:"#333"};background:${d.estado===k?v.bg:"#1a1a1a"}">
           ${d.estado===k?"✓ ":""}${v.label}
         </button>`).join("")}
 
-      <div style="font-size:13px;color:#aaa;font-weight:700;margin:18px 0 10px">TICKET DE ENTREGA</div>
-      ${d.ticketImg
-        ? `<img src="${d.ticketImg}" style="width:100%;border-radius:12px;margin-bottom:10px" id="ticketImgEl" />
-           <div style="display:flex;gap:8px;margin-bottom:10px">
-             <button id="btnWhatsapp"
-               class="btn-primary"
-               style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;background:#25D366">
-               📲 WhatsApp
-             </button>
-             <a id="btnDescargar" href="${d.ticketImg}" download="${filenameForTicket(d)}"
-               class="btn-secondary"
-               style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;text-decoration:none">
-               ⬇️ Descargar
-             </a>
-           </div>`
-        : `<div style="color:#555;font-size:13px;margin-bottom:10px">No hay foto del ticket aún.</div>`}
+      <div style="font-size:13px;color:#aaa;font-weight:700;margin:18px 0 10px">TICKETS DE ENTREGA</div>
+      ${ticketImgs.length?`
+        <div class="gallery" style="margin-bottom:10px">
+          ${ticketImgs.map((img,idx)=>`
+            <div class="thumb" data-ticket-open="${idx}">
+              <img src="${img}" alt="Ticket ${idx+1}" />
+              <div class="thumb-label">Ticket ${idx+1}</div>
+            </div>
+          `).join("")}
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+          <button id="btnWhatsapp" class="btn-primary" style="background:#25D366">📲 WhatsApp</button>
+          <button id="btnDescargarTodo" class="btn-secondary">⬇️ Descargar ticket principal</button>
+        </div>
+      `:`<div style="color:#555;font-size:13px;margin-bottom:10px">No hay foto del ticket aún.</div>`}
 
       <div class="upload-area" id="ticketUpload" style="margin-bottom:8px">
         <div style="font-size:24px">📷</div>
-        <div style="color:#ddd;font-size:13px;margin-top:4px;font-weight:700">${d.ticketImg?"Cambiar foto del ticket":"Subir foto del ticket"}</div>
-        <div style="color:#777;font-size:12px;margin-top:6px">También puedes pegar una imagen con <span class="kdb">Ctrl+V</span></div>
+        <div style="color:#ddd;font-size:13px;margin-top:4px;font-weight:700">${ticketImgs.length?"Agregar / cambiar ticket(s)":"Subir ticket(s)"}</div>
+        <div style="color:#777;font-size:12px;margin-top:6px">Puedes subir varias fotos. En FedEx, sube las 2.</div>
       </div>
 
-      <input type="file" id="ticketFileInput" accept="image/*" capture="environment" style="display:none" />
+      <div style="text-align:center;font-size:12px;color:#555;margin-bottom:16px">
+        o pega una imagen con <span class="kdb">Ctrl+V</span>
+      </div>
+
+      <input type="file" id="ticketFileInput" accept="image/*" multiple capture="environment" style="display:none" />
 
       <div style="font-size:13px;color:#aaa;font-weight:700;margin:18px 0 10px">HISTORIAL</div>
       ${(Array.isArray(d.historial) && d.historial.length)
@@ -1179,6 +1328,8 @@ function bindDetalle(){
   const d=state.despachos.find(x=>x.id===state.selectedId);
   if(!d) return;
 
+  const ticketImgs=Array.isArray(d.ticketImgs)?d.ticketImgs:(d.ticketImg?[d.ticketImg]:[]);
+
   document.getElementById("btnBack").onclick=()=>setState({view:"lista"});
 
   document.getElementById("btnDelete").onclick=()=>{
@@ -1191,26 +1342,38 @@ function bindDetalle(){
       form:{
         ...emptyForm(),
         ...d,
-        imgPreview:d.docImg||null
+        imgPreview:d.docImg||null,
+        ticketImgs:[...ticketImgs],
+        ticketImg:ticketImgs[0]||""
       }
     });
   };
 
-  document.getElementById("btnExportOne").onclick=()=>{
-    if(d.ticketImg){
-      const a=document.createElement("a");
-      a.href=d.ticketImg;
-      a.download=filenameForTicket(d);
-      a.click();
-    }else{
-      showToast("Este despacho no tiene ticket");
-    }
-  };
+  const btnText=document.getElementById("btnShareOnlyText");
+  if(btnText){
+    btnText.onclick=()=>{
+      const nombre=String(d.nombre||"").toUpperCase().trim();
+      const tracking=String(d.tracking||"").trim();
+      const msg=tracking
+        ? `HOLA ${nombre}. TU DESPACHO FUE ENVIADO. NÚMERO DE SEGUIMIENTO: ${tracking}`
+        : `HOLA ${nombre}. TU DESPACHO FUE ENVIADO.`;
+      window.open("https://api.whatsapp.com/send?text="+encodeURIComponent(msg),"_blank");
+    };
+  }
+
+  document.querySelectorAll("[data-doc-open]").forEach(el=>{
+    el.onclick=()=>openImageOverlay(d.docImg);
+  });
+
+  document.querySelectorAll("[data-ticket-open]").forEach(el=>{
+    const idx=+el.dataset.ticketOpen;
+    el.onclick=()=>openImageOverlay(ticketImgs[idx]);
+  });
 
   document.querySelectorAll(".btn-estado").forEach(btn=>{
     btn.onclick=()=>{
       const nuevoEstado=btn.dataset.estado;
-      if(nuevoEstado==="entregado" && !d.ticketImg){
+      if(nuevoEstado==="entregado" && !ticketImgs.length){
         const seguir=confirm("Este despacho se marcará como entregado sin ticket. ¿Continuar?");
         if(!seguir) return;
       }
@@ -1218,90 +1381,134 @@ function bindDetalle(){
     };
   });
 
-  const docMini=document.getElementById("docMiniatura");
-  if(docMini && d.docImg){
-    docMini.onclick=()=>{
-      const overlay=document.createElement("div");
-      overlay.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px";
-      overlay.innerHTML=`<img src="${d.docImg}" style="max-width:100%;max-height:100%;border-radius:12px" /><button style="position:fixed;top:16px;right:16px;background:none;border:none;color:#fff;font-size:30px;cursor:pointer">✕</button>`;
-      overlay.onclick=()=>overlay.remove();
-      document.body.appendChild(overlay);
-    };
-  }
-
   const btnWa=document.getElementById("btnWhatsapp");
   if(btnWa){
     btnWa.onclick=async(e)=>{
       e.preventDefault();
+      const nombre=String(d.nombre||"").toUpperCase().trim();
+      const tracking=String(d.tracking||"").trim();
+      const mensaje=tracking
+        ? `HOLA ${nombre}. TU DESPACHO FUE ENVIADO. NÚMERO DE SEGUIMIENTO: ${tracking}`
+        : `HOLA ${nombre}. TU DESPACHO FUE ENVIADO.`;
+
       try{
-        const text=`Hola, ${d.nombre}. Tu despacho fue enviado.`;
-        if(d.ticketImg && navigator.share){
-          const res=await fetch(d.ticketImg);
-          const blob=await res.blob();
-          const file=new File([blob],filenameForTicket(d),{type:blob.type||"image/jpeg"});
-          await navigator.share({text,files:[file]});
+        if(ticketImgs.length && navigator.share){
+          const files=[];
+          for(let i=0;i<ticketImgs.length;i++){
+            const res=await fetch(ticketImgs[i]);
+            const blob=await res.blob();
+            files.push(new File([blob],filenameForTicket(d,i),{type:blob.type||"image/jpeg"}));
+          }
+          await navigator.share({text:mensaje,files});
         }else if(navigator.share){
-          await navigator.share({text});
+          await navigator.share({text:mensaje});
         }else{
-          window.open("https://api.whatsapp.com/send?text="+encodeURIComponent(text)," _blank");
+          window.open("https://api.whatsapp.com/send?text="+encodeURIComponent(mensaje),"_blank");
         }
       }catch(err){
         if(err.name!=="AbortError"){
-          const text=`Hola, ${d.nombre}. Tu despacho fue enviado.`;
-          window.open("https://api.whatsapp.com/send?text="+encodeURIComponent(text),"_blank");
+          window.open("https://api.whatsapp.com/send?text="+encodeURIComponent(mensaje),"_blank");
         }
+      }
+    };
+  }
+
+  const btnDesc=document.getElementById("btnDescargarTodo");
+  if(btnDesc){
+    btnDesc.onclick=()=>{
+      if(ticketImgs.length){
+        const a=document.createElement("a");
+        a.href=ticketImgs[0];
+        a.download=filenameForTicket(d,0);
+        a.click();
+      }else{
+        showToast("No hay ticket para descargar");
       }
     };
   }
 
   document.getElementById("ticketUpload").onclick=()=>document.getElementById("ticketFileInput").click();
-  document.getElementById("ticketFileInput").onchange=e=>guardarTicket(e.target.files[0]);
+  document.getElementById("ticketFileInput").onchange=e=>guardarTickets(Array.from(e.target.files||[]));
 
   const onPaste=e=>{
     const items=e.clipboardData?.items;
     if(!items) return;
+    const files=[];
     for(const item of items){
       if(item.type.startsWith("image/")){
         e.preventDefault();
-        guardarTicket(item.getAsFile());
-        break;
+        files.push(item.getAsFile());
       }
     }
+    if(files.length) guardarTickets(files);
   };
   document.addEventListener("paste",onPaste);
   window._pasteCleanup=()=>document.removeEventListener("paste",onPaste);
 }
 
-// ── GUARDAR TICKET ────────────────────────────────────────────────────────────
-function guardarTicket(file){
-  if(!file) return;
+// ── GUARDAR TICKETS ───────────────────────────────────────────────────────────
+async function guardarTickets(files){
+  if(!files || !files.length) return;
   const d=state.despachos.find(x=>x.id===state.selectedId);
   if(!d) return;
 
-  showToast("Procesando ticket...");
-  const reader=new FileReader();
+  showToast("Procesando ticket(s)...");
 
-  reader.onload=async ev=>{
-    let tracking=d.tracking||"";
+  const nuevasImgs=[];
+  let trackingDetectado=d.tracking||"";
+
+  for(const file of files){
+    if(!file.type.startsWith("image/")) continue;
+
+    const imgData=await new Promise((resolve,reject)=>{
+      const reader=new FileReader();
+      reader.onload=ev=>resolve(ev.target.result);
+      reader.onerror=reject;
+      reader.readAsDataURL(file);
+    });
+
+    nuevasImgs.push(imgData);
+
     try{
-      const tData=await extractTicketData(file);
-      if(tData.tracking) tracking=tData.tracking;
+      const text=await ocrImage(file,"spa");
+      const tracking=detectTrackingByAgency(text, d.agencia==="Otra..."?d.agenciaCustom:d.agencia);
+      if(tracking && !trackingDetectado){
+        trackingDetectado=tracking;
+      }
+      if((String(d.agencia||"").toLowerCase().includes("fedex")) && tracking){
+        trackingDetectado=tracking;
+      }
     }catch(err){
-      console.error("OCR ticket:",err);
+      console.log("No se pudo leer tracking de uno de los tickets",err);
     }
+  }
 
-    const nuevo={
-      ...d,
-      ticketImg:ev.target.result,
-      tracking,
-      historial:addHistory(d,"Ticket cargado",tracking?`Tracking detectado: ${tracking}`:"Se cargó ticket de entrega")
-    };
+  let ticketImgsActuales=Array.isArray(d.ticketImgs)?[...d.ticketImgs]:(d.ticketImg?[d.ticketImg]:[]);
 
-    dbActualizar(nuevo);
-    showToast(tracking?`Ticket cargado · Tracking ${tracking}`:"Ticket cargado");
+  if(String(d.agencia||"").toLowerCase().includes("fedex")){
+    // en fedex dejamos hasta 2 fotos
+    ticketImgsActuales=[...ticketImgsActuales,...nuevasImgs].slice(0,2);
+  }else{
+    ticketImgsActuales=[...ticketImgsActuales,...nuevasImgs];
+  }
+
+  // Si no quieres acumular infinito en otras agencias, cambia aquí a slice(-3) por ejemplo
+  const nuevo={
+    ...d,
+    ticketImgs:ticketImgsActuales,
+    ticketImg:ticketImgsActuales[0]||"",
+    tracking:trackingDetectado,
+    historial:addHistory(
+      d,
+      "Ticket cargado",
+      trackingDetectado
+        ? `Se cargó ticket y se detectó tracking: ${trackingDetectado}`
+        : `Se cargó ${nuevasImgs.length} ticket${nuevasImgs.length>1?"s":""}`
+    )
   };
 
-  reader.readAsDataURL(file);
+  dbActualizar(nuevo);
+  showToast(trackingDetectado?`Ticket cargado · Tracking ${trackingDetectado}`:"Ticket(s) cargado(s)");
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
