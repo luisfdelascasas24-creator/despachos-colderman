@@ -29,37 +29,131 @@
 
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:Inter,sans-serif;background:#0f0f0f;color:#f1f1f1;min-height:100vh}
+    :root{
+      --bg:#0f0f0f;
+      --panel:#1a1a1a;
+      --panel2:#202020;
+      --line:#2a2a2a;
+      --line2:#333;
+      --text:#f1f1f1;
+      --muted:#888;
+      --muted2:#666;
+      --accent:#e07b00;
+      --accent2:#f59e0b;
+      --ok:#10b981;
+      --danger:#ef4444;
+    }
+    html,body{background:var(--bg);color:var(--text);min-height:100vh}
+    body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
     input,select,textarea,button{font-family:inherit}
-    .header{background:#1a1a1a;border-bottom:1px solid #2a2a2a;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}
-    .btn-primary{background:linear-gradient(135deg,#e07b00,#f59e0b);color:#fff;border:none;border-radius:10px;padding:11px 18px;font-weight:700;font-size:14px;cursor:pointer}
+    .header{
+      background:rgba(26,26,26,.92);
+      backdrop-filter:blur(8px);
+      border-bottom:1px solid var(--line);
+      padding:14px 16px;
+      display:flex;align-items:center;justify-content:space-between;gap:10px;
+      position:sticky;top:0;z-index:20
+    }
+    .btn-primary,.btn-secondary,.btn-danger,.btn-ghost{
+      border:none;border-radius:12px;padding:11px 16px;font-weight:700;font-size:14px;cursor:pointer;transition:.18s transform,.18s opacity,.18s background,.18s border-color
+    }
+    .btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff}
+    .btn-secondary{background:#252525;color:#fff;border:1px solid var(--line2)}
+    .btn-danger{background:#2a0000;color:#fff;border:1px solid #5a1a1a}
+    .btn-ghost{background:none;color:#aaa;border:1px solid var(--line2)}
     .btn-back{background:none;border:none;color:#aaa;font-size:22px;cursor:pointer;padding:4px 8px}
-    .btn-delete{background:none;border:none;color:#ef4444;font-size:20px;cursor:pointer}
-    .btn-estado{width:100%;border-radius:10px;padding:13px 16px;font-size:15px;font-weight:600;cursor:pointer;text-align:left;margin-bottom:10px}
+    .btn-delete{background:none;border:none;color:var(--danger);font-size:20px;cursor:pointer}
+    .btn-estado{
+      width:100%;border-radius:12px;padding:13px 16px;font-size:15px;font-weight:600;cursor:pointer;text-align:left;margin-bottom:10px;
+      border:1px solid var(--line2);transition:.18s transform,.18s background,.18s border-color
+    }
+    .btn-primary:active,.btn-secondary:active,.btn-danger:active,.btn-ghost:active,.btn-estado:active,.card:active,.counter:active,.chip:active,.mini-card:active{transform:scale(.985)}
     .field{margin-bottom:14px}
-    .field label{font-size:12px;color:#888;display:block;margin-bottom:5px}
-    .field input,.field select,.field textarea{width:100%;background:#252525;border:1px solid #333;border-radius:10px;padding:11px 12px;color:#fff;font-size:15px;outline:none}
+    .field label{font-size:12px;color:var(--muted);display:block;margin-bottom:5px}
+    .field input,.field select,.field textarea{
+      width:100%;background:#252525;border:1px solid var(--line2);border-radius:12px;padding:11px 12px;color:#fff;font-size:15px;outline:none
+    }
     .field textarea{resize:none}
-    .field input::placeholder{color:#555}
-    .card{background:#1a1a1a;border-radius:14px;padding:16px;cursor:pointer;border:1px solid #2a2a2a;margin-bottom:10px}
-    .counters{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;padding:14px 16px 0}
-    .counter{border-radius:12px;padding:10px 8px;text-align:center;cursor:pointer;border:1px solid #2a2a2a;background:#1a1a1a}
+    .field input::placeholder,.field textarea::placeholder{color:#555}
+    .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--accent)}
+    .card,.mini-card,.dashboard-card{
+      background:var(--panel);border-radius:16px;border:1px solid var(--line);box-shadow:0 6px 18px rgba(0,0,0,.14)
+    }
+    .card{padding:16px;cursor:pointer;margin-bottom:10px;transition:.16s transform,.16s border-color,.16s background}
+    .card:hover{border-color:#3b3b3b}
+    .mini-card{padding:12px}
+    .dashboard-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:14px 16px 0;max-width:1000px;margin:0 auto}
+    .dashboard-card{padding:12px;text-align:center}
+    .dashboard-num{font-size:24px;font-weight:800}
+    .dashboard-lbl{font-size:11px;color:var(--muted);margin-top:4px}
+    .counters{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;padding:14px 16px 0;max-width:1000px;margin:0 auto}
+    .counter{border-radius:14px;padding:10px 8px;text-align:center;cursor:pointer;border:1px solid var(--line);background:var(--panel);transition:.16s transform,.16s border-color}
     .counter .num{font-size:22px;font-weight:700}
-    .counter .lbl{font-size:10px;color:#888;margin-top:2px}
+    .counter .lbl{font-size:10px;color:var(--muted);margin-top:2px}
     .badge{border-radius:20px;padding:3px 10px;font-size:12px;font-weight:600;border:1px solid;white-space:nowrap}
-    .page{max-width:600px;margin:0 auto;padding:16px}
+    .page{max-width:680px;margin:0 auto;padding:16px}
     .row{display:flex;gap:8px;margin-bottom:8px}
-    .row .lbl{font-size:13px;color:#666;min-width:80px;flex-shrink:0}
-    .row .val{font-size:13px;color:#ddd}
+    .row .lbl{font-size:13px;color:var(--muted2);min-width:96px;flex-shrink:0}
+    .row .val{font-size:13px;color:#ddd;word-break:break-word}
     .empty{text-align:center;color:#555;padding:50px 0;font-size:15px}
     .tabs{display:flex;gap:8px;margin-bottom:16px}
-    .tab{flex:1;padding:10px 6px;border-radius:10px;border:1px solid #333;background:#1a1a1a;color:#888;font-size:13px;font-weight:600;cursor:pointer;text-align:center;transition:all .2s}
-    .tab.active{border-color:#e07b00;color:#e07b00;background:#2a1f00}
-    .upload-area{border:2px dashed #333;border-radius:14px;padding:20px;text-align:center;cursor:pointer;background:#1a1a1a;margin-bottom:14px}
-    .upload-area img{max-height:150px;border-radius:8px;max-width:100%}
-    .extracting{color:#f59e0b;text-align:center;margin:6px 0;font-size:13px}
-    .extract-error{color:#ef4444;font-size:12px;margin-bottom:8px}
-    .section-sep{font-size:11px;color:#555;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin:16px 0 10px}
+    .tab{
+      flex:1;padding:10px 6px;border-radius:12px;border:1px solid var(--line2);background:var(--panel);color:var(--muted);font-size:13px;font-weight:600;cursor:pointer;text-align:center;transition:all .2s
+    }
+    .tab.active{border-color:var(--accent);color:var(--accent);background:#2a1f00}
+    .upload-area{
+      border:2px dashed #333;border-radius:16px;padding:20px;text-align:center;cursor:pointer;background:var(--panel);
+      margin-bottom:14px;transition:.18s border-color,.18s background,.18s transform
+    }
+    .upload-area.dragover{border-color:var(--accent);background:#21180a;transform:scale(1.01)}
+    .upload-area img{max-height:180px;border-radius:10px;max-width:100%}
+    .extracting{color:var(--accent2);text-align:center;margin:8px 0;font-size:13px}
+    .extract-error{color:var(--danger);font-size:12px;margin-bottom:8px;text-align:center}
+    .extract-ok{color:var(--ok);font-size:12px;margin-bottom:8px;text-align:center}
+    .section-sep{font-size:11px;color:#555;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin:16px 0 10px}
+    .banner{
+      max-width:1000px;margin:0 auto;padding:10px 16px;font-size:13px;display:flex;align-items:center;gap:8px
+    }
+    .banner.warn{background:#2a0000;color:var(--danger);border-left:3px solid var(--danger)}
+    .banner.info{background:#2a1f00;color:var(--accent2);border-left:3px solid var(--accent2)}
+    .filters-wrap{max-width:1000px;margin:0 auto;padding:10px 16px 0}
+    .chips{display:flex;gap:8px;flex-wrap:wrap}
+    .chip{
+      background:var(--panel);border:1px solid var(--line2);color:var(--muted);border-radius:999px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer
+    }
+    .chip.active{background:#2a1f00;border-color:var(--accent);color:var(--accent2)}
+    .layout{display:flex;gap:12px;align-items:flex-start;max-width:1000px;margin:0 auto;padding:12px 16px 16px}
+    .layout-main{flex:1;min-width:0}
+    .layout-side{width:180px;flex-shrink:0;display:flex;flex-direction:column;gap:8px}
+    .summary-title{font-size:11px;color:#555;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px}
+    .resumen-item{
+      background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 10px;cursor:pointer;display:flex;justify-content:space-between;align-items:center
+    }
+    .history-item{padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--panel);margin-bottom:8px}
+    .history-type{font-size:12px;font-weight:700}
+    .history-date{font-size:11px;color:var(--muted);margin-top:2px}
+    .history-note{font-size:12px;color:#bbb;margin-top:4px}
+    .pill{
+      display:inline-flex;align-items:center;gap:6px;background:#252525;border:1px solid var(--line2);color:#bbb;border-radius:999px;padding:6px 10px;font-size:12px;font-weight:700
+    }
+    .toast{
+      position:fixed;left:50%;bottom:20px;transform:translateX(-50%);
+      background:#161616;border:1px solid #333;color:#fff;padding:12px 14px;border-radius:14px;z-index:9999;
+      min-width:220px;max-width:90vw;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,.35)
+    }
+    .kdb{background:#252525;border:1px solid #333;border-radius:4px;padding:1px 5px}
+    @media (max-width:860px){
+      .dashboard-grid{grid-template-columns:repeat(2,1fr)}
+      .layout{flex-direction:column}
+      .layout-side{width:100%}
+    }
+    @media (max-width:560px){
+      .header{padding:12px}
+      .btn-primary,.btn-secondary,.btn-danger,.btn-ghost{padding:10px 12px;font-size:13px}
+      .dashboard-grid,.counters,.filters-wrap,.layout{padding-left:12px;padding-right:12px}
+      .counters{grid-template-columns:1fr 1fr 1fr}
+      .page{padding:12px}
+    }
   </style>
 </head>
 <body>
@@ -75,17 +169,35 @@ const ESTADOS={
   falta_doc:{label:"Falta documento",color:"#ef4444",bg:"#2a0000"},
 };
 
-const emptyForm=() => ({
-  nombre:"",rut:"",
-  nDoc:"",bultos:"",
+const emptyForm=()=>({
+  id:null,
+  fbKey:"",
+  nombre:"",
+  rut:"",
+  nDoc:"",
+  bultos:"",
+  tracking:"",
   tipoCompra:"importacion",
-  empresaNacional:"",empresaNacionalCustom:"",
+  empresaNacional:"",
+  empresaNacionalCustom:"",
   destino:"provincia",
-  agencia:"",agenciaCustom:"",
-  direccionDestino:"",region:"",
+  agencia:"",
+  agenciaCustom:"",
+  direccionDestino:"",
+  region:"",
   notas:"",
-  imgPreview:null,extracting:false,extractError:""
+  imgPreview:null,
+  extracting:false,
+  extractError:"",
+  extractSuccess:"",
+  statusMessage:"",
+  ticketImg:"",
+  fecha:"",
+  estado:"pendiente",
+  historial:[]
 });
+
+let toastTimeout=null;
 
 let state={
   despachos:[],
@@ -96,9 +208,72 @@ let state={
   filtroDia:"todos",
   filtroAgencia:"",
   filtroFecha:"",
+  filtroExtra:"",
   form:emptyForm(),
   useFirebase:false
 };
+
+function showToast(msg){
+  const old=document.getElementById("appToast");
+  if(old) old.remove();
+  const el=document.createElement("div");
+  el.id="appToast";
+  el.className="toast";
+  el.textContent=msg;
+  document.body.appendChild(el);
+  clearTimeout(toastTimeout);
+  toastTimeout=setTimeout(()=>{
+    const t=document.getElementById("appToast");
+    if(t) t.remove();
+  },2600);
+}
+
+function normalizeText(v){
+  return String(v||"")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g,"")
+    .replace(/[.\-_/]/g,"")
+    .replace(/\s+/g," ")
+    .trim();
+}
+
+function formatDateCL(date){
+  return new Date(date).toLocaleDateString("es-CL");
+}
+
+function formatDateInputFromCL(clDate){
+  if(!clDate) return "";
+  const parts=clDate.split("/");
+  if(parts.length!==3) return "";
+  const [dd,mm,yyyy]=parts;
+  return `${yyyy}-${mm.padStart(2,"0")}-${dd.padStart(2,"0")}`;
+}
+
+function slugify(v){
+  return String(v||"archivo")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+    .toLowerCase().replace(/[^a-z0-9]+/g,"-")
+    .replace(/^-+|-+$/g,"")
+    .slice(0,60) || "archivo";
+}
+
+function nowStamp(){
+  return Date.now();
+}
+
+function addHistory(despacho,tipo,nota=""){
+  const historial=Array.isArray(despacho.historial)?despacho.historial:[];
+  return [
+    {
+      ts:nowStamp(),
+      fecha:new Date().toLocaleString("es-CL"),
+      tipo,
+      nota
+    },
+    ...historial
+  ];
+}
 
 // ── FIREBASE ──────────────────────────────────────────────────────────────────
 function initStorage(){
@@ -111,47 +286,67 @@ function initStorage(){
       render();
     });
   } else {
-    try {
+    try{
       state.despachos=JSON.parse(localStorage.getItem("dcold")||"[]");
-    } catch {
+    }catch{
       state.despachos=[];
     }
     render();
   }
 }
-
 function saveLocal(){
   localStorage.setItem("dcold",JSON.stringify(state.despachos));
 }
-
 function dbGuardar(d){
   if(state.useFirebase){
-    window._db.ref("despachos").push(d);
-  } else {
+    const payload={...d};
+    delete payload.fbKey;
+    window._db.ref("despachos").push(payload);
+  }else{
     state.despachos=[d,...state.despachos];
     saveLocal();
     render();
   }
 }
-
-function dbEstado(id,fbKey,estado){
-  if(state.useFirebase && fbKey){
-    window._db.ref("despachos/"+fbKey).update({estado});
-  } else {
-    state.despachos=state.despachos.map(d=>d.id===id?{...d,estado}:d);
+function dbActualizar(d){
+  if(state.useFirebase && d.fbKey){
+    const payload={...d};
+    delete payload.fbKey;
+    window._db.ref("despachos/"+d.fbKey).set(payload);
+  }else{
+    state.despachos=state.despachos.map(x=>x.id===d.id?d:x);
     saveLocal();
     render();
   }
 }
-
+function dbEstado(id,fbKey,estado){
+  const d=state.despachos.find(x=>x.id===id);
+  if(!d) return;
+  const nuevo={
+    ...d,
+    estado,
+    historial:addHistory(d,"Estado cambiado",estado)
+  };
+  if(state.useFirebase && fbKey){
+    const payload={...nuevo};
+    delete payload.fbKey;
+    window._db.ref("despachos/"+fbKey).set(payload);
+  }else{
+    state.despachos=state.despachos.map(x=>x.id===id?nuevo:x);
+    saveLocal();
+    render();
+  }
+  showToast("Estado actualizado");
+}
 function dbEliminar(id,fbKey){
   if(state.useFirebase && fbKey){
     window._db.ref("despachos/"+fbKey).remove();
-  } else {
+  }else{
     state.despachos=state.despachos.filter(d=>d.id!==id);
     saveLocal();
   }
   setState({view:"lista",selectedId:null});
+  showToast("Despacho eliminado");
 }
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
@@ -161,12 +356,10 @@ function setState(p){
   Object.assign(state,p);
   render();
 }
-
 function badge(e){
-  const v=ESTADOS[e];
+  const v=ESTADOS[e]||ESTADOS.pendiente;
   return `<span class="badge" style="color:${v.color};border-color:${v.color};background:${v.bg}">${v.label}</span>`;
 }
-
 function counts(){
   return {
     pendiente:state.despachos.filter(d=>d.estado==="pendiente").length,
@@ -174,103 +367,261 @@ function counts(){
     falta_doc:state.despachos.filter(d=>d.estado==="falta_doc").length
   };
 }
+function dashboardData(){
+  const hoy=new Date().toLocaleDateString("es-CL");
+  return {
+    total:state.despachos.length,
+    hoy:state.despachos.filter(d=>d.fecha===hoy).length,
+    sinTicket:state.despachos.filter(d=>d.estado==="entregado" && !d.ticketImg).length,
+    atrasados:state.despachos.filter(d=>d.estado==="pendiente" && d.fecha!==hoy).length
+  };
+}
+function getAgencyLabel(d){
+  if(d.destino==="bodega") return "🏭 Bodega";
+  if(d.destino==="oficina") return "🏢 Oficina";
+  return d.agencia==="Otra..."?(d.agenciaCustom||"Otra"):d.agencia;
+}
+function getEmpresaLabel(d){
+  return d.empresaNacional==="Otra..."?(d.empresaNacionalCustom||"Otra"):d.empresaNacional;
+}
+function inferDocNumber(text){
+  const patterns=[
+    /(cotizaci[oó]n|cotizacion)[^\d]{0,12}(\d{3,12})/i,
+    /(factura)[^\d]{0,12}(\d{3,12})/i,
+    /(boleta)[^\d]{0,12}(\d{3,12})/i,
+    /(n[°º.]|nro|numero|folio)[^\d]{0,12}(\d{3,12})/i
+  ];
+  for(const re of patterns){
+    const m=text.match(re);
+    if(m) return m[2];
+  }
+  return "";
+}
+function inferTracking(text){
+  const clean=text.replace(/\s+/g," ");
+  const patterns=[
+    /\b(?:tracking|seguimiento|gu[ií]a|guia|awb|n[úu]mero de env[ií]o|n[úu]mero de seguimiento)[^\d]{0,14}([A-Z0-9\-]{6,24})\b/i,
+    /\b([A-Z]{2,6}\-?\d{6,18})\b/,
+    /\b(\d{8,18})\b/
+  ];
+  for(const re of patterns){
+    const m=clean.match(re);
+    if(m){
+      const val=(m[1]||"").trim();
+      if(val.length>=6) return val;
+    }
+  }
+  return "";
+}
+function inferRut(text,lines){
+  let rut="";
+  for(let i=0;i<lines.length;i++){
+    const l=lines[i].toUpperCase();
+    if(/^RUT[:\s]/.test(l)){
+      const m=lines[i].match(/(\d{1,2}(?:\.\d{3}){2}-[\dkK]|\d{7,8}-[\dkK])/);
+      if(m){rut=m[1];break;}
+    }
+  }
+  if(!rut){
+    const m=text.match(/\b(\d{1,2}(?:\.\d{3}){2}-[\dkK]|\d{7,8}-[\dkK])\b/);
+    if(m) rut=m[1];
+  }
+  return rut;
+}
+function inferNombre(lines,text){
+  let nombre="";
+  for(let i=0;i<lines.length;i++){
+    const l=lines[i].toUpperCase();
+    if(/SE[NÑ]OR(?:ES)?|SENOR(?:ES)?|CLIENTE|DESTINATARIO|A NOMBRE|RAZON SOCIAL/.test(l)){
+      const partes=lines[i].split(/:\s*/);
+      if(partes.length>1 && partes[1].trim().length>2){
+        nombre=partes.slice(1).join(":").trim();
+      }else if(i+1<lines.length){
+        nombre=lines[i+1].trim();
+      }
+      if(nombre) break;
+    }
+  }
+  if(!nombre){
+    const likely=lines.find(x=>/^[A-ZÁÉÍÓÚÑ0-9 .&-]{6,}$/.test(x) && !/(FACTURA|BOLETA|COTIZACION|COTIZACIÓN|RUT|FECHA|TOTAL|NETO|IVA)/i.test(x));
+    if(likely) nombre=likely;
+  }
+  return nombre;
+}
+async function ocrImage(file,lang="spa"){
+  const {createWorker}=Tesseract;
+  const worker=await createWorker(lang);
+  const {data:{text}}=await worker.recognize(file);
+  await worker.terminate();
+  return text;
+}
+async function extractDocData(file){
+  const text=await ocrImage(file,"spa");
+  const lines=text.split("\n").map(l=>l.trim()).filter(Boolean);
+  return {
+    text,
+    nombre:inferNombre(lines,text),
+    rut:inferRut(text,lines),
+    nDoc:inferDocNumber(text)
+  };
+}
+async function extractTicketData(file){
+  const text=await ocrImage(file,"spa");
+  return {
+    text,
+    tracking:inferTracking(text)
+  };
+}
+function filenameForTicket(d){
+  const base=slugify(d.nombre||"cliente");
+  const fecha=slugify((d.fecha||new Date().toLocaleDateString("es-CL")).replace(/\//g,"-"));
+  const track=slugify(d.tracking||"");
+  return track?`${base}-${fecha}-${track}.jpg`:`${base}-${fecha}.jpg`;
+}
+function exportCSV(){
+  const head=["Nombre","RUT","Documento","Tracking","Estado","Fecha","Tipo","Destino","Agencia","Dirección","Notas"];
+  const rows=state.despachos.map(d=>[
+    `"${String(d.nombre||"").replace(/"/g,'""')}"`,
+    `"${String(d.rut||"").replace(/"/g,'""')}"`,
+    `"${String(d.nDoc||"").replace(/"/g,'""')}"`,
+    `"${String(d.tracking||"").replace(/"/g,'""')}"`,
+    `"${String(d.estado||"").replace(/"/g,'""')}"`,
+    `"${String(d.fecha||"").replace(/"/g,'""')}"`,
+    `"${String(d.tipoCompra||"").replace(/"/g,'""')}"`,
+    `"${String(d.destino||"").replace(/"/g,'""')}"`,
+    `"${String(getAgencyLabel(d)||"").replace(/"/g,'""')}"`,
+    `"${String(d.direccionDestino||"").replace(/"/g,'""')}"`,
+    `"${String(d.notas||"").replace(/"/g,'""')}"`
+  ].join(","));
+  const csv="\uFEFF"+head.join(",")+"\n"+rows.join("\n");
+  const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url;
+  a.download="despachos-colderman.csv";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  showToast("CSV exportado");
+}
+function findPossibleDuplicate(form){
+  const rutN=normalizeText(form.rut);
+  const docN=normalizeText(form.nDoc);
+  const nombreN=normalizeText(form.nombre);
+  return state.despachos.find(d=>{
+    if(form.id && d.id===form.id) return false;
+    const drut=normalizeText(d.rut);
+    const ddoc=normalizeText(d.nDoc);
+    const dnom=normalizeText(d.nombre);
+    if(rutN && docN && drut===rutN && ddoc===docN) return true;
+    if(docN && nombreN && ddoc===docN && dnom===nombreN) return true;
+    return false;
+  });
+}
 
-// ── EXTRACCIÓN OCR ────────────────────────────────────────────────────────────
+// ── EXTRACCIÓN OCR DOC ────────────────────────────────────────────────────────
 async function handleFile(file){
   if(!file) return;
-
   state.form.extractError="";
+  state.form.extractSuccess="";
   state.form.extracting=true;
+  state.form.statusMessage="Procesando captura...";
   render();
   setTimeout(bindNuevo,0);
 
   const reader=new FileReader();
   reader.onload=async e=>{
     state.form.imgPreview=e.target.result;
+    render();
+    setTimeout(bindNuevo,0);
     try{
-      const {createWorker}=Tesseract;
-      const worker=await createWorker("spa");
-      const {data:{text}}=await worker.recognize(file);
-      await worker.terminate();
-
-      const lines=text.split("\n").map(l=>l.trim()).filter(l=>l.length>0);
-
-      let nombre="";
-      for(let i=0;i<lines.length;i++){
-        const l=lines[i].toUpperCase();
-        if(/SE[NÑ]OR|SENOR|CLIENTE|DESTINATARIO|A NOMBRE/.test(l)){
-          const partes=lines[i].split(/:\s*/);
-          if(partes.length>1 && partes[1].trim().length>2){
-            nombre=partes[1].trim();
-          } else if(i+1<lines.length){
-            nombre=lines[i+1].trim();
-          }
-          break;
-        }
-      }
-
-      state.form.nombre=nombre;
-
-      const nDocMatch=text.match(/(?:N[°º\.]+|COTIZACI[OÓ]N\s*N[°º]?|FACTURA\s*N[°º]?)\s*[:\s]*(\d{3,6})/i);
-      state.form.nDoc=nDocMatch ? nDocMatch[1] : "";
-
-      let rut="";
-      for(let i=0;i<lines.length;i++){
-        const l=lines[i].toUpperCase();
-        if(/^RUT[:\s]/.test(l)){
-          const m=lines[i].match(/(\d{1,2}[\.\d]*-[\dkK])/);
-          if(m){ rut=m[1]; break; }
-        }
-      }
-      if(!rut){
-        const m=text.match(/\b(\d{1,2}\.\d{3}\.\d{3}-[\dkK])\b/);
-        if(m) rut=m[1];
-      }
-      state.form.rut=rut;
-
+      const data=await extractDocData(file);
+      if(data.nombre) state.form.nombre=data.nombre;
+      if(data.rut) state.form.rut=data.rut;
+      if(data.nDoc) state.form.nDoc=data.nDoc;
       state.form.extracting=false;
-      if(!state.form.nombre && !state.form.rut){
+      state.form.statusMessage="";
+      if(data.nombre || data.rut || data.nDoc){
+        const found=[
+          data.nombre?"nombre":"",
+          data.rut?"RUT":"",
+          data.nDoc?"N° documento":""
+        ].filter(Boolean).join(", ");
+        state.form.extractSuccess=`✅ Datos encontrados: ${found}`;
+      }else{
         state.form.extractError="No se pudo extraer. Rellena manualmente.";
       }
-    } catch {
+    }catch(err){
+      console.error(err);
       state.form.extracting=false;
+      state.form.statusMessage="";
       state.form.extractError="No se pudo extraer. Rellena manualmente.";
     }
-
     render();
     setTimeout(bindNuevo,0);
   };
-
   reader.readAsDataURL(file);
 }
 
 // ── GUARDAR ───────────────────────────────────────────────────────────────────
 function guardar(){
   const f=state.form;
-  if(!f.nombre.trim()) return;
+  if(!f.nombre.trim()){
+    showToast("Falta el nombre del cliente");
+    return;
+  }
+  if(f.destino==="provincia" && !f.agencia){
+    showToast("Selecciona una agencia para provincia");
+    return;
+  }
 
-  dbGuardar({
-    id:Date.now(),
+  const dup=findPossibleDuplicate(f);
+  if(dup){
+    const seguir=confirm(`Parece duplicado:\n${dup.nombre}${dup.nDoc?" · N° "+dup.nDoc:""}\n\n¿Guardar igual?`);
+    if(!seguir) return;
+  }
+
+  const existe=state.despachos.find(d=>d.id===f.id);
+  const base={
+    id:existe?f.id:Date.now(),
+    fbKey:existe?(f.fbKey||existe.fbKey||""):(f.fbKey||""),
     ts:Date.now(),
     nombre:f.nombre.trim(),
     rut:f.rut.trim(),
     nDoc:(f.nDoc||"").trim(),
-    bultos:f.bultos || "",
-    docImg:f.imgPreview || "",
+    bultos:f.bultos||"",
+    tracking:(f.tracking||"").trim(),
+    docImg:f.imgPreview||"",
     tipoCompra:f.tipoCompra,
     empresaNacional:f.empresaNacional,
-    empresaNacionalCustom:f.empresaNacionalCustom.trim(),
+    empresaNacionalCustom:(f.empresaNacionalCustom||"").trim(),
     destino:f.destino,
     agencia:f.agencia,
-    agenciaCustom:f.agenciaCustom.trim(),
-    direccionDestino:f.direccionDestino.trim(),
-    region:f.region,
-    notas:f.notas.trim(),
-    estado:"pendiente",
-    fecha:new Date().toLocaleDateString("es-CL"),
-  });
+    agenciaCustom:(f.agenciaCustom||"").trim(),
+    direccionDestino:(f.direccionDestino||"").trim(),
+    region:f.region||"",
+    notas:(f.notas||"").trim(),
+    ticketImg:existe?(f.ticketImg||existe.ticketImg||""):(f.ticketImg||""),
+    estado:existe?(f.estado||existe.estado||"pendiente"):"pendiente",
+    fecha:existe?(f.fecha||existe.fecha):new Date().toLocaleDateString("es-CL"),
+    historial:existe
+      ? addHistory(existe,"Despacho editado","Se actualizaron datos del despacho")
+      : addHistory(baseDummy(),"Despacho creado","Creación inicial")
+  };
+
+  if(existe){
+    dbActualizar(base);
+    showToast("Despacho editado");
+  }else{
+    dbGuardar(base);
+    showToast("Despacho guardado");
+  }
 
   setState({view:"lista",form:emptyForm()});
+}
+function baseDummy(){
+  return {historial:[]};
 }
 
 // ── RENDER ────────────────────────────────────────────────────────────────────
@@ -293,12 +644,14 @@ function render(){
 // ── LISTA ─────────────────────────────────────────────────────────────────────
 function renderLista(){
   const c=counts();
+  const dash=dashboardData();
   const hoy=new Date().toLocaleDateString("es-CL");
   const pendientesAtrasados=state.despachos.filter(d=>d.estado==="pendiente" && d.fecha!==hoy);
+  const sinTicket=state.despachos.filter(d=>d.estado==="entregado" && !d.ticketImg);
 
   const filtrados=(()=>{
     let arr=state.filtro==="todos"
-      ? state.despachos
+      ? [...state.despachos]
       : state.despachos.filter(d=>d.estado===state.filtro);
 
     if(state.filtroDia==="hoy") arr=arr.filter(d=>d.fecha===hoy);
@@ -309,18 +662,31 @@ function renderLista(){
     }
 
     if(state.filtroAgencia){
-      arr=arr.filter(d=>{
-        const ag=d.agencia==="Otra..." ? (d.agenciaCustom||"Otra") : d.agencia;
-        return ag===state.filtroAgencia;
-      });
+      arr=arr.filter(d=>getAgencyLabel(d)===state.filtroAgencia);
+    }
+
+    if(state.filtroExtra==="atrasados"){
+      arr=arr.filter(d=>d.estado==="pendiente" && d.fecha!==hoy);
+    }
+    if(state.filtroExtra==="sin_ticket"){
+      arr=arr.filter(d=>d.estado==="entregado" && !d.ticketImg);
+    }
+    if(state.filtroExtra==="nacional"){
+      arr=arr.filter(d=>d.tipoCompra==="nacional");
+    }
+    if(state.filtroExtra==="importacion"){
+      arr=arr.filter(d=>d.tipoCompra==="importacion");
     }
 
     if(state.busqueda.trim()){
-      const q=state.busqueda.toLowerCase().trim();
-      arr=arr.filter(d=>
-        [d.nombre,d.rut,d.nDoc,d.agencia,d.agenciaCustom,d.direccionDestino,d.empresaNacional,d.empresaNacionalCustom,d.notas]
-          .some(v=>v && String(v).toLowerCase().includes(q))
-      );
+      const q=normalizeText(state.busqueda);
+      arr=arr.filter(d=>{
+        const fields=[
+          d.nombre,d.rut,d.nDoc,d.tracking,d.agencia,d.agenciaCustom,d.direccionDestino,
+          d.empresaNacional,d.empresaNacionalCustom,d.notas,getAgencyLabel(d)
+        ].map(normalizeText).join(" ");
+        return fields.includes(q) || fields.indexOf(q)>-1;
+      });
     }
 
     return arr;
@@ -329,30 +695,35 @@ function renderLista(){
   const cards=filtrados.length===0
     ? `<div class="empty">${state.despachos.length===0?"No hay despachos. Agrega el primero.":"Sin resultados."}</div>`
     : filtrados.map(d=>{
-      const agenciaLabel=d.agencia==="Otra..." ? (d.agenciaCustom||"Otra") : d.agencia;
-      const empresaLabel=d.empresaNacional==="Otra..." ? (d.empresaNacionalCustom||"Otra") : d.empresaNacional;
+      const agenciaLabel=getAgencyLabel(d);
+      const empresaLabel=getEmpresaLabel(d);
       const destinoLabel=d.destino==="provincia" ? "📦 Provincia" : d.destino==="oficina" ? "🏢 Oficina" : "🏭 Bodega";
       const atrasado=d.estado==="pendiente" && d.fecha!==hoy;
-
       return `
       <div class="card" data-id="${d.id}" style="border-color:${atrasado?"#ef444455":"#2a2a2a"}">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;gap:8px">
           <div style="flex:1;min-width:0">
             <div style="font-weight:700;font-size:15px;margin-bottom:2px">${d.nombre}</div>
-            <div style="font-size:12px;color:#666">${d.rut?"RUT: "+d.rut:""}${d.nDoc?" · N° "+d.nDoc:""}</div>
+            <div style="font-size:12px;color:#666">
+              ${d.rut?"RUT: "+d.rut:""}
+              ${d.nDoc?" · N° "+d.nDoc:""}
+              ${d.tracking?" · Tracking "+d.tracking:""}
+            </div>
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;margin-left:8px">
             ${badge(d.estado)}
-            <span style="font-size:11px;color:${atrasado?"#ef4444":"#555"}">${d.fecha}</span>
+            <span style="font-size:11px;color:${atrasado?"#ef4444":"#555"}">${d.fecha||""}</span>
           </div>
         </div>
+
         <div style="border-top:1px solid #2a2a2a;padding-top:8px;display:grid;grid-template-columns:1fr 1fr;gap:4px 12px">
           <div style="font-size:12px;color:#888">🌏 ${d.tipoCompra==="importacion"?"Importación":"Compra nacional"}</div>
           <div style="font-size:12px;color:#888">${destinoLabel}</div>
           ${agenciaLabel?`<div style="font-size:12px;color:#888">🚚 ${agenciaLabel}</div>`:""}
           ${empresaLabel?`<div style="font-size:12px;color:#888">🏭 ${empresaLabel}</div>`:""}
           ${d.direccionDestino?`<div style="font-size:12px;color:#aaa;grid-column:1/-1">📍 ${d.direccionDestino}</div>`:""}
-          ${d.bultos?`<div style="font-size:12px;color:#888">📦 ${d.bultos} bulto${d.bultos>1?"s":""}</div>`:""}
+          ${d.bultos?`<div style="font-size:12px;color:#888">📦 ${d.bultos} bulto${+d.bultos>1?"s":""}</div>`:""}
+          ${d.ticketImg?`<div style="font-size:12px;color:#10b981">🧾 Ticket cargado</div>`:`<div style="font-size:12px;color:#666">🧾 Sin ticket</div>`}
           ${d.notas?`<div style="font-size:12px;color:#666;grid-column:1/-1;font-style:italic">💬 ${d.notas}</div>`:""}
         </div>
       </div>`;
@@ -361,16 +732,38 @@ function renderLista(){
   return `
     <div class="header">
       <div>
-        <div style="font-weight:700;font-size:17px">📦 Despachos Colderman</div>
+        <div style="font-weight:800;font-size:17px">📦 Despachos Colderman</div>
         <div style="font-size:12px;color:#666">${state.despachos.length} total · ${state.useFirebase?"🔄 sincronizado":"local"}</div>
       </div>
-      <button class="btn-primary" id="btnNuevo">+ Nuevo</button>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn-secondary" id="btnExport">Exportar</button>
+        <button class="btn-primary" id="btnNuevo">+ Nuevo</button>
+      </div>
     </div>
 
-    ${pendientesAtrasados.length>0 ? `
-    <div style="background:#2a0000;border-left:3px solid #ef4444;padding:10px 16px;font-size:13px;color:#ef4444;display:flex;align-items:center;gap:8px">
-      ⚠️ Tienes <strong>${pendientesAtrasados.length}</strong> despacho${pendientesAtrasados.length>1?"s":""} pendiente${pendientesAtrasados.length>1?"s":""} de días anteriores
-    </div>` : ""}
+    ${pendientesAtrasados.length>0?`
+    <div class="banner warn">⚠️ Tienes <strong>${pendientesAtrasados.length}</strong> despacho${pendientesAtrasados.length>1?"s":""} pendiente${pendientesAtrasados.length>1?"s":""} de días anteriores</div>`:""}
+    ${sinTicket.length>0?`
+    <div class="banner info">🧾 Hay <strong>${sinTicket.length}</strong> despacho${sinTicket.length>1?"s":""} entregado${sinTicket.length>1?"s":""} sin ticket</div>`:""}
+
+    <div class="dashboard-grid">
+      <div class="dashboard-card">
+        <div class="dashboard-num">${dash.total}</div>
+        <div class="dashboard-lbl">Total</div>
+      </div>
+      <div class="dashboard-card">
+        <div class="dashboard-num">${dash.hoy}</div>
+        <div class="dashboard-lbl">Ingresados hoy</div>
+      </div>
+      <div class="dashboard-card">
+        <div class="dashboard-num" style="color:#f59e0b">${dash.atrasados}</div>
+        <div class="dashboard-lbl">Pendientes atrasados</div>
+      </div>
+      <div class="dashboard-card">
+        <div class="dashboard-num" style="color:#10b981">${dash.sinTicket}</div>
+        <div class="dashboard-lbl">Entregados sin ticket</div>
+      </div>
+    </div>
 
     <div class="counters">
       ${Object.entries(ESTADOS).map(([k,v])=>`
@@ -380,69 +773,63 @@ function renderLista(){
         </div>`).join("")}
     </div>
 
-    <div style="padding:8px 16px 0;max-width:600px;margin:0 auto;display:flex;gap:8px;align-items:center">
-      <div style="position:relative;flex:1">
-        <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#555;font-size:16px">🔍</span>
-        <input id="searchInput" value="${state.busqueda||""}" placeholder="Buscar nombre, RUT, N° doc..."
-          style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:10px;padding:10px 12px 10px 36px;color:#fff;font-size:14px;outline:none" />
-      </div>
-      <button id="btnHoy" style="background:${state.filtroDia==="hoy"?"#e07b00":"#1a1a1a"};border:1px solid ${state.filtroDia==="hoy"?"#e07b00":"#333"};color:${state.filtroDia==="hoy"?"#fff":"#888"};border-radius:10px;padding:10px 14px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">
-        📅 Hoy
-      </button>
-    </div>
-
-    <div style="padding:8px 16px 0;max-width:600px;margin:0 auto;display:flex;gap:8px">
-      <div style="position:relative;flex:1">
+    <div class="filters-wrap">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+        <div style="position:relative;flex:1;min-width:220px">
+          <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#555;font-size:16px">🔍</span>
+          <input id="searchInput" value="${state.busqueda||""}" placeholder="Buscar nombre, RUT, N° doc, tracking..."
+            style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;padding:11px 12px 11px 36px;color:#fff;font-size:14px;outline:none" />
+        </div>
+        <button class="chip ${state.filtroDia==="hoy"?"active":""}" id="btnHoy">📅 Hoy</button>
         <input type="date" id="filtroCalendario" value="${state.filtroFecha||""}"
-          style="width:100%;background:#1a1a1a;border:1px solid ${state.filtroFecha?"#e07b00":"#2a2a2a"};border-radius:10px;padding:10px 12px;color:${state.filtroFecha?"#e07b00":"#888"};font-size:14px;outline:none;cursor:pointer" />
+          style="background:#1a1a1a;border:1px solid ${state.filtroFecha?"#e07b00":"#2a2a2a"};border-radius:12px;padding:10px 12px;color:${state.filtroFecha?"#e07b00":"#888"};font-size:14px;outline:none;cursor:pointer" />
+        ${state.filtroFecha?`<button class="chip" id="btnLimpiarFecha">✕ Limpiar fecha</button>`:""}
+        <select id="filtroAgencia" style="min-width:180px;background:#1a1a1a;border:1px solid ${state.filtroAgencia?"#e07b00":"#2a2a2a"};border-radius:12px;padding:10px 12px;color:${state.filtroAgencia?"#e07b00":"#888"};font-size:13px;outline:none">
+          <option value="">🚚 Agencia...</option>
+          ${[...new Set(state.despachos.map(d=>getAgencyLabel(d)).filter(Boolean))].map(a=>`<option value="${a}" ${state.filtroAgencia===a?"selected":""}>${a}</option>`).join("")}
+        </select>
       </div>
-      ${state.filtroFecha?`<button id="btnLimpiarFecha" style="background:#1a1a1a;border:1px solid #333;color:#888;border-radius:10px;padding:10px 14px;font-size:13px;cursor:pointer;white-space:nowrap">✕ Limpiar</button>`:""}
-      <select id="filtroAgencia" style="flex:1;background:#1a1a1a;border:1px solid ${state.filtroAgencia?"#e07b00":"#2a2a2a"};border-radius:10px;padding:10px 12px;color:${state.filtroAgencia?"#e07b00":"#888"};font-size:13px;outline:none">
-        <option value="">🚚 Agencia...</option>
-        ${AGENCIAS.filter(a=>a!=="Otra...").map(a=>`<option value="${a}" ${state.filtroAgencia===a?"selected":""}>${a}</option>`).join("")}
-      </select>
+      <div class="chips">
+        <button class="chip ${state.filtroExtra==="atrasados"?"active":""}" id="chipAtrasados">Pendientes atrasados</button>
+        <button class="chip ${state.filtroExtra==="sin_ticket"?"active":""}" id="chipSinTicket">Sin ticket</button>
+        <button class="chip ${state.filtroExtra==="importacion"?"active":""}" id="chipImportacion">Importación</button>
+        <button class="chip ${state.filtroExtra==="nacional"?"active":""}" id="chipNacional">Nacional</button>
+        ${(state.filtroExtra||state.filtroAgencia||state.filtroFecha||state.filtroDia==="hoy"||state.filtro!=="todos")?`<button class="chip" id="chipLimpiarTodo">Limpiar filtros</button>`:""}
+      </div>
     </div>
 
-    <div style="display:flex;gap:12px;align-items:flex-start;max-width:960px;margin:0 auto;padding:12px 16px 0">
-      <div style="flex:1;min-width:0">
+    <div class="layout">
+      <div class="layout-main">
         ${cards}
       </div>
 
-      <div style="width:160px;flex-shrink:0;display:flex;flex-direction:column;gap:8px">
-        <div style="font-size:11px;color:#555;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px">Resumen hoy</div>
+      <div class="layout-side">
+        <div class="summary-title">Resumen pendiente</div>
         ${(()=>{
-          const pendHoy=state.despachos.filter(d=>d.estado==="pendiente");
+          const pend=state.despachos.filter(d=>d.estado==="pendiente");
           const conteo={};
-
-          pendHoy.forEach(d=>{
-            const key=d.destino==="bodega"
-              ? "🏭 Bodega"
-              : d.destino==="oficina"
-                ? "🏢 Oficina"
-                : (d.agencia==="Otra..." ? (d.agenciaCustom||"Otra") : d.agencia) || "Sin agencia";
+          pend.forEach(d=>{
+            const key=getAgencyLabel(d)||"Sin agencia";
             conteo[key]=(conteo[key]||0)+1;
           });
-
           if(Object.keys(conteo).length===0){
-            return `<div style="font-size:12px;color:#555;text-align:center;padding:10px 0">Sin pendientes</div>`;
+            return `<div class="mini-card" style="font-size:12px;color:#555;text-align:center">Sin pendientes</div>`;
           }
-
           return Object.entries(conteo)
             .sort((a,b)=>b[1]-a[1])
             .map(([k,v])=>`
-              <div class="resumen-item" data-agencia="${k}"
-                style="background:${state.filtroAgencia===k?"#2a1f00":"#1a1a1a"};border:1px solid ${state.filtroAgencia===k?"#e07b00":"#2a2a2a"};border-radius:10px;padding:8px 10px;cursor:pointer;display:flex;justify-content:space-between;align-items:center">
+              <div class="resumen-item" data-agencia="${k}" style="background:${state.filtroAgencia===k?"#2a1f00":"#1a1a1a"};border-color:${state.filtroAgencia===k?"#e07b00":"#2a2a2a"}">
                 <span style="font-size:12px;color:#ccc;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${k}</span>
                 <span style="font-size:14px;font-weight:700;color:#e07b00;margin-left:6px">${v}</span>
               </div>`).join("");
         })()}
-        ${state.filtroAgencia?`<button id="btnLimpiarResumen" style="background:none;border:1px solid #333;border-radius:8px;padding:6px;color:#666;font-size:11px;cursor:pointer">✕ Limpiar filtro</button>`:""}
       </div>
     </div>`;
 }
 
 function bindLista(){
   document.getElementById("btnNuevo").onclick=()=>setState({view:"nuevo",form:emptyForm()});
+  document.getElementById("btnExport").onclick=exportCSV;
 
   Object.keys(ESTADOS).forEach(k=>{
     document.getElementById("cnt-"+k).onclick=()=>setState({filtro:state.filtro===k?"todos":k});
@@ -472,27 +859,34 @@ function bindLista(){
     filtroAgencia:e.target.value
   });
 
+  const x1=document.getElementById("btnLimpiarFecha");
+  if(x1) x1.onclick=()=>setState({filtroFecha:""});
+
+  document.getElementById("chipAtrasados").onclick=()=>setState({filtroExtra:state.filtroExtra==="atrasados"?"": "atrasados"});
+  document.getElementById("chipSinTicket").onclick=()=>setState({filtroExtra:state.filtroExtra==="sin_ticket"?"":"sin_ticket"});
+  document.getElementById("chipImportacion").onclick=()=>setState({filtroExtra:state.filtroExtra==="importacion"?"":"importacion"});
+  document.getElementById("chipNacional").onclick=()=>setState({filtroExtra:state.filtroExtra==="nacional"?"":"nacional"});
+
+  const clearAll=document.getElementById("chipLimpiarTodo");
+  if(clearAll){
+    clearAll.onclick=()=>setState({
+      filtro:"todos",
+      filtroDia:"todos",
+      filtroAgencia:"",
+      filtroFecha:"",
+      filtroExtra:""
+    });
+  }
+
   document.querySelectorAll(".resumen-item").forEach(el=>{
-    el.onclick=()=>{
-      const ag=el.dataset.agencia;
-      if(ag==="🏭 Bodega" || ag==="🏢 Oficina"){
-        setState({filtroAgencia:"",filtro:"todos"});
-      } else {
-        setState({filtroAgencia:state.filtroAgencia===ag?"":ag});
-      }
-    };
+    el.onclick=()=>setState({filtroAgencia:state.filtroAgencia===el.dataset.agencia?"":el.dataset.agencia});
   });
-
-  const btnLR=document.getElementById("btnLimpiarResumen");
-  if(btnLR) btnLR.onclick=()=>setState({filtroAgencia:""});
-
-  const btnLF=document.getElementById("btnLimpiarFecha");
-  if(btnLF) btnLF.onclick=()=>setState({filtroFecha:""});
 }
 
-// ── NUEVO ─────────────────────────────────────────────────────────────────────
+// ── NUEVO / EDITAR ────────────────────────────────────────────────────────────
 function renderNuevo(){
   const f=state.form;
+  const isEdit=!!f.id;
   const isNacional=f.tipoCompra==="nacional";
   const showEmpresaCustom=isNacional && f.empresaNacional==="Otra...";
   const isProvincia=f.destino==="provincia";
@@ -501,40 +895,50 @@ function renderNuevo(){
   return `
     <div class="header">
       <button class="btn-back" id="btnBack">←</button>
-      <span style="font-weight:700;font-size:16px">Nuevo Despacho</span>
+      <span style="font-weight:700;font-size:16px">${isEdit?"Editar despacho":"Nuevo Despacho"}</span>
       <div style="width:40px"></div>
     </div>
 
     <div class="page">
-      <div class="upload-area" id="uploadArea">
+      <div class="upload-area" id="uploadArea" tabindex="0">
         ${f.imgPreview
           ? `<img src="${f.imgPreview}" alt="doc" />`
-          : `<div style="font-size:30px">📎</div><div style="color:#888;font-size:13px;margin-top:6px">Toca para subir pantallazo de factura o cotización</div>`}
+          : `<div style="font-size:34px">📎</div>
+             <div style="color:#ddd;font-size:14px;margin-top:8px;font-weight:700">Sube, arrastra o pega con Ctrl+V tu captura</div>
+             <div style="color:#777;font-size:12px;margin-top:6px">Factura, cotización o boleta</div>`}
       </div>
 
       <input type="file" id="fileInput" accept="image/*" style="display:none" />
-      ${f.extracting?`<div class="extracting">⏳ Extrayendo datos...</div>`:""}
+
+      ${f.extracting?`<div class="extracting">⏳ ${f.statusMessage||"Extrayendo datos..."}</div>`:""}
+      ${f.extractSuccess?`<div class="extract-ok">${f.extractSuccess}</div>`:""}
       ${f.extractError?`<div class="extract-error">${f.extractError}</div>`:""}
 
       <div class="field">
         <label>Nombre del cliente / empresa *</label>
-        <input id="fNombre" value="${f.nombre}" placeholder="Extraído o escribe aquí" />
+        <input id="fNombre" value="${f.nombre||""}" placeholder="Extraído o escribe aquí" />
       </div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div class="field">
           <label>RUT</label>
-          <input id="fRut" value="${f.rut}" placeholder="Ej: 12.345.678-9" />
+          <input id="fRut" value="${f.rut||""}" placeholder="Ej: 12.345.678-9" />
         </div>
         <div class="field">
-          <label>N° Cotización / Factura</label>
+          <label>N° Cotización / Factura / Boleta</label>
           <input id="fNDoc" value="${f.nDoc||""}" placeholder="Ej: 5065" />
         </div>
       </div>
 
-      <div class="field">
-        <label>Cantidad de bultos</label>
-        <input id="fBultos" type="number" min="1" value="${f.bultos||""}" placeholder="Ej: 3" />
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="field">
+          <label>Cantidad de bultos</label>
+          <input id="fBultos" type="number" min="1" value="${f.bultos||""}" placeholder="Ej: 3" />
+        </div>
+        <div class="field">
+          <label>Tracking</label>
+          <input id="fTracking" value="${f.tracking||""}" placeholder="Opcional / si ya lo tienes" />
+        </div>
       </div>
 
       <div class="section-sep">Tipo de compra</div>
@@ -543,7 +947,7 @@ function renderNuevo(){
         <div class="tab ${isNacional?"active":""}" id="tabNacional">🇨🇱 Compra nacional</div>
       </div>
 
-      ${isNacional ? `
+      ${isNacional?`
         <div class="field">
           <label>Empresa proveedora</label>
           <select id="fEmpresaNacional">
@@ -551,12 +955,12 @@ function renderNuevo(){
             ${EMPRESAS_NACIONAL.map(e=>`<option ${f.empresaNacional===e?"selected":""}>${e}</option>`).join("")}
           </select>
         </div>
-        ${showEmpresaCustom ? `
+        ${showEmpresaCustom?`
           <div class="field">
             <label>¿Cuál empresa?</label>
-            <input id="fEmpresaCustom" value="${f.empresaNacionalCustom}" placeholder="Nombre de la empresa" />
-          </div>` : ""}
-      ` : ""}
+            <input id="fEmpresaCustom" value="${f.empresaNacionalCustom||""}" placeholder="Nombre de la empresa" />
+          </div>`:""}
+      `:""}
 
       <div class="section-sep">Destino del envío</div>
       <div class="tabs">
@@ -565,7 +969,7 @@ function renderNuevo(){
         <div class="tab ${f.destino==="bodega"?"active":""}" id="tabBodega">🏭 Bodega</div>
       </div>
 
-      ${isProvincia ? `
+      ${isProvincia?`
         <div class="field">
           <label>Agencia de envío</label>
           <select id="fAgencia">
@@ -573,29 +977,28 @@ function renderNuevo(){
             ${AGENCIAS.map(a=>`<option ${f.agencia===a?"selected":""}>${a}</option>`).join("")}
           </select>
         </div>
-
-        ${showAgenciaCustom ? `
+        ${showAgenciaCustom?`
           <div class="field">
             <label>¿Cuál agencia?</label>
-            <input id="fAgenciaCustom" value="${f.agenciaCustom}" placeholder="Nombre de la agencia" />
-          </div>` : ""}
-
+            <input id="fAgenciaCustom" value="${f.agenciaCustom||""}" placeholder="Nombre de la agencia" />
+          </div>`:""}
         <div class="field">
           <label>Dirección / sucursal de destino</label>
-          <input id="fDireccion" value="${f.direccionDestino}" placeholder="Ej: Sucursal Starken Talca, Av. O'Higgins 123" />
+          <input id="fDireccion" value="${f.direccionDestino||""}" placeholder="Ej: Sucursal Starken Talca, Av. O'Higgins 123" />
         </div>
-      ` : `
-        <div style="background:#1a1a1a;border-radius:10px;padding:12px;margin-bottom:14px;font-size:13px;color:#888">
+      `:`
+        <div style="background:#1a1a1a;border-radius:12px;padding:12px;margin-bottom:14px;font-size:13px;color:#888">
           ${f.destino==="oficina"?"🏢 El pedido se recibe en oficina.":"🏭 El pedido se recoge en bodega."}
         </div>
       `}
 
       <div class="field">
         <label>Notas adicionales</label>
-        <textarea id="fNotas" rows="2" placeholder="Observaciones...">${f.notas}</textarea>
+        <textarea id="fNotas" rows="2" placeholder="Observaciones...">${f.notas||""}</textarea>
       </div>
 
-      <button class="btn-primary" id="btnGuardar" style="width:100%;padding:14px;font-size:16px;margin-bottom:24px">Guardar despacho</button>
+      <button class="btn-primary" id="btnGuardar" style="width:100%;padding:14px;font-size:16px;margin-bottom:10px">${isEdit?"Guardar cambios":"Guardar despacho"}</button>
+      <div style="text-align:center;color:#666;font-size:12px">Tip: pega con <span class="kdb">Ctrl+V</span>, arrastra la imagen o haz clic para subir</div>
     </div>`;
 }
 
@@ -606,8 +1009,26 @@ function bindNuevo(){
   };
 
   document.getElementById("btnBack").onclick=()=>setState({view:"lista",form:emptyForm()});
-  document.getElementById("uploadArea").onclick=()=>document.getElementById("fileInput").click();
-  document.getElementById("fileInput").onchange=e=>handleFile(e.target.files[0]);
+
+  const uploadArea=document.getElementById("uploadArea");
+  const fileInput=document.getElementById("fileInput");
+
+  uploadArea.onclick=()=>fileInput.click();
+  fileInput.onchange=e=>handleFile(e.target.files[0]);
+
+  uploadArea.addEventListener("dragover",e=>{
+    e.preventDefault();
+    uploadArea.classList.add("dragover");
+  });
+  uploadArea.addEventListener("dragleave",()=>{
+    uploadArea.classList.remove("dragover");
+  });
+  uploadArea.addEventListener("drop",e=>{
+    e.preventDefault();
+    uploadArea.classList.remove("dragover");
+    const file=e.dataTransfer.files?.[0];
+    if(file && file.type.startsWith("image/")) handleFile(file);
+  });
 
   const onPasteNuevo=e=>{
     const items=e.clipboardData?.items;
@@ -620,7 +1041,6 @@ function bindNuevo(){
       }
     }
   };
-
   document.addEventListener("paste",onPasteNuevo);
   window._pasteNuevoCleanup=()=>document.removeEventListener("paste",onPasteNuevo);
 
@@ -628,6 +1048,7 @@ function bindNuevo(){
   document.getElementById("fRut").oninput=e=>{state.form.rut=e.target.value;};
   document.getElementById("fNDoc").oninput=e=>{state.form.nDoc=e.target.value;};
   document.getElementById("fBultos").oninput=e=>{state.form.bultos=e.target.value;};
+  document.getElementById("fTracking").oninput=e=>{state.form.tracking=e.target.value;};
 
   document.getElementById("tabImport").onclick=()=>{state.form.tipoCompra="importacion";re();};
   document.getElementById("tabNacional").onclick=()=>{state.form.tipoCompra="nacional";re();};
@@ -661,9 +1082,9 @@ function renderDetalle(){
   const d=state.despachos.find(x=>x.id===state.selectedId);
   if(!d) return renderLista();
 
-  const empresaLabel=d.empresaNacional==="Otra..." ? (d.empresaNacionalCustom||"Otra") : d.empresaNacional;
-  const agenciaLabel=d.agencia==="Otra..." ? (d.agenciaCustom||"Otra") : d.agencia;
-  const destinoLabel=d.destino==="provincia" ? "📦 Envío a provincia" : d.destino==="oficina" ? "🏢 Recepción en oficina" : "🏭 Recojo en bodega";
+  const empresaLabel=getEmpresaLabel(d);
+  const agenciaLabel=getAgencyLabel(d);
+  const destinoLabel=d.destino==="provincia"?"📦 Envío a provincia":d.destino==="oficina"?"🏢 Recepción en oficina":"🏭 Recojo en bodega";
 
   return `
     <div class="header">
@@ -673,13 +1094,24 @@ function renderDetalle(){
     </div>
 
     <div class="page">
-      <div style="background:#1a1a1a;border-radius:14px;padding:20px;margin-bottom:16px">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+        <button class="btn-primary" id="btnEditar">✏️ Editar</button>
+        <button class="btn-secondary" id="btnExportOne">⬇️ Descargar ticket</button>
+      </div>
+
+      <div style="background:#1a1a1a;border-radius:16px;padding:20px;margin-bottom:16px;border:1px solid #2a2a2a">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;gap:8px">
           <div>
-            <div style="font-size:18px;font-weight:700">${d.nombre}</div>
+            <div style="font-size:18px;font-weight:800">${d.nombre}</div>
             ${d.rut?`<div style="color:#888;font-size:13px">RUT: ${d.rut}</div>`:""}
           </div>
           ${badge(d.estado)}
+        </div>
+
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+          ${d.nDoc?`<span class="pill">📄 N° ${d.nDoc}</span>`:""}
+          ${d.tracking?`<span class="pill">🚚 ${d.tracking}</span>`:""}
+          ${d.ticketImg?`<span class="pill">🧾 Ticket cargado</span>`:`<span class="pill">🧾 Sin ticket</span>`}
         </div>
 
         <div class="row"><span class="lbl">Tipo</span><span class="val">${d.tipoCompra==="importacion"?"🌏 Importación":"🇨🇱 Compra nacional"}</span></div>
@@ -688,32 +1120,35 @@ function renderDetalle(){
         ${agenciaLabel?`<div class="row"><span class="lbl">Agencia</span><span class="val">${agenciaLabel}</span></div>`:""}
         ${d.direccionDestino?`<div class="row"><span class="lbl">Dirección</span><span class="val">${d.direccionDestino}</span></div>`:""}
         ${d.region?`<div class="row"><span class="lbl">Región</span><span class="val">${d.region}</span></div>`:""}
+        ${d.bultos?`<div class="row"><span class="lbl">Bultos</span><span class="val">${d.bultos}</span></div>`:""}
         ${d.notas?`<div class="row"><span class="lbl">Notas</span><span class="val">${d.notas}</span></div>`:""}
-        <div class="row"><span class="lbl">Ingresado</span><span class="val">${d.fecha}</span></div>
+        <div class="row"><span class="lbl">Ingresado</span><span class="val">${d.fecha||""}</span></div>
       </div>
 
-      <div style="font-size:13px;color:#aaa;font-weight:600;margin:16px 0 10px">DOCUMENTO</div>
+      <div style="font-size:13px;color:#aaa;font-weight:700;margin:16px 0 10px">DOCUMENTO</div>
       ${d.docImg
-        ? `<img src="${d.docImg}" id="docMiniatura" style="width:100%;max-height:120px;object-fit:cover;border-radius:12px;margin-bottom:16px;cursor:pointer" title="Toca para ver completo" />`
+        ? `<img src="${d.docImg}" id="docMiniatura" style="width:100%;max-height:160px;object-fit:cover;border-radius:12px;margin-bottom:16px;cursor:pointer" title="Toca para ver completo" />`
         : `<div style="color:#555;font-size:13px;margin-bottom:16px">Sin documento adjunto.</div>`}
 
-      <div style="font-size:13px;color:#aaa;font-weight:600;margin-bottom:10px">CAMBIAR ESTADO</div>
+      <div style="font-size:13px;color:#aaa;font-weight:700;margin-bottom:10px">CAMBIAR ESTADO</div>
       ${Object.entries(ESTADOS).map(([k,v])=>`
         <button class="btn-estado" data-estado="${k}" data-fbkey="${d.fbKey||""}"
           style="color:${v.color};border-color:${d.estado===k?v.color:"#333"};background:${d.estado===k?v.bg:"#1a1a1a"}">
           ${d.estado===k?"✓ ":""}${v.label}
         </button>`).join("")}
 
-      <div style="font-size:13px;color:#aaa;font-weight:600;margin:16px 0 10px">TICKET DE ENTREGA</div>
+      <div style="font-size:13px;color:#aaa;font-weight:700;margin:18px 0 10px">TICKET DE ENTREGA</div>
       ${d.ticketImg
         ? `<img src="${d.ticketImg}" style="width:100%;border-radius:12px;margin-bottom:10px" id="ticketImgEl" />
            <div style="display:flex;gap:8px;margin-bottom:10px">
              <button id="btnWhatsapp"
-               style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;background:#25D366;color:#fff;border-radius:10px;padding:12px;font-weight:700;font-size:14px;border:none;cursor:pointer">
+               class="btn-primary"
+               style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;background:#25D366">
                📲 WhatsApp
              </button>
-             <a id="btnDescargar" href="${d.ticketImg}" download="ticket-${d.nombre.replace(/\s/g,'-')}.jpg"
-               style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;background:#1a1a1a;border:1px solid #333;color:#aaa;border-radius:10px;padding:12px;font-weight:700;font-size:14px;text-decoration:none">
+             <a id="btnDescargar" href="${d.ticketImg}" download="${filenameForTicket(d)}"
+               class="btn-secondary"
+               style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;text-decoration:none">
                ⬇️ Descargar
              </a>
            </div>`
@@ -721,31 +1156,70 @@ function renderDetalle(){
 
       <div class="upload-area" id="ticketUpload" style="margin-bottom:8px">
         <div style="font-size:24px">📷</div>
-        <div style="color:#888;font-size:13px;margin-top:4px">${d.ticketImg?"Cambiar foto del ticket":"Subir foto del ticket"}</div>
+        <div style="color:#ddd;font-size:13px;margin-top:4px;font-weight:700">${d.ticketImg?"Cambiar foto del ticket":"Subir foto del ticket"}</div>
+        <div style="color:#777;font-size:12px;margin-top:6px">También puedes pegar una imagen con <span class="kdb">Ctrl+V</span></div>
       </div>
 
-      <div style="text-align:center;font-size:12px;color:#555;margin-bottom:24px">
-        o pega una imagen con <kbd style="background:#252525;border:1px solid #333;border-radius:4px;padding:1px 5px">Ctrl+V</kbd>
-      </div>
+      <input type="file" id="ticketFileInput" accept="image/*" capture="environment" style="display:none" />
 
-      <input type="file" id="ticketFileInput" accept="image/*" style="display:none" />
+      <div style="font-size:13px;color:#aaa;font-weight:700;margin:18px 0 10px">HISTORIAL</div>
+      ${(Array.isArray(d.historial) && d.historial.length)
+        ? d.historial.map(h=>`
+            <div class="history-item">
+              <div class="history-type">${h.tipo}</div>
+              ${h.nota?`<div class="history-note">${h.nota}</div>`:""}
+              <div class="history-date">${h.fecha||""}</div>
+            </div>`).join("")
+        : `<div style="color:#555;font-size:13px">Sin historial aún.</div>`
+      }
     </div>`;
 }
 
 function bindDetalle(){
   const d=state.despachos.find(x=>x.id===state.selectedId);
+  if(!d) return;
 
   document.getElementById("btnBack").onclick=()=>setState({view:"lista"});
+
   document.getElementById("btnDelete").onclick=()=>{
     if(confirm("¿Eliminar este despacho?")) dbEliminar(state.selectedId,d?.fbKey);
   };
 
+  document.getElementById("btnEditar").onclick=()=>{
+    setState({
+      view:"nuevo",
+      form:{
+        ...emptyForm(),
+        ...d,
+        imgPreview:d.docImg||null
+      }
+    });
+  };
+
+  document.getElementById("btnExportOne").onclick=()=>{
+    if(d.ticketImg){
+      const a=document.createElement("a");
+      a.href=d.ticketImg;
+      a.download=filenameForTicket(d);
+      a.click();
+    }else{
+      showToast("Este despacho no tiene ticket");
+    }
+  };
+
   document.querySelectorAll(".btn-estado").forEach(btn=>{
-    btn.onclick=()=>dbEstado(state.selectedId,btn.dataset.fbkey,btn.dataset.estado);
+    btn.onclick=()=>{
+      const nuevoEstado=btn.dataset.estado;
+      if(nuevoEstado==="entregado" && !d.ticketImg){
+        const seguir=confirm("Este despacho se marcará como entregado sin ticket. ¿Continuar?");
+        if(!seguir) return;
+      }
+      dbEstado(state.selectedId,btn.dataset.fbkey,nuevoEstado);
+    };
   });
 
   const docMini=document.getElementById("docMiniatura");
-  if(docMini && d?.docImg){
+  if(docMini && d.docImg){
     docMini.onclick=()=>{
       const overlay=document.createElement("div");
       overlay.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px";
@@ -756,23 +1230,25 @@ function bindDetalle(){
   }
 
   const btnWa=document.getElementById("btnWhatsapp");
-  if(btnWa && d){
+  if(btnWa){
     btnWa.onclick=async(e)=>{
       e.preventDefault();
       try{
+        const text=`Hola, ${d.nombre}. Tu despacho fue enviado.`;
         if(d.ticketImg && navigator.share){
           const res=await fetch(d.ticketImg);
           const blob=await res.blob();
-          const file=new File([blob],"ticket.jpg",{type:blob.type});
-          await navigator.share({text:d.nombre,files:[file]});
-        } else if(navigator.share){
-          await navigator.share({text:d.nombre});
-        } else {
-          window.open("https://api.whatsapp.com/send?text="+encodeURIComponent(d.nombre),"_blank");
+          const file=new File([blob],filenameForTicket(d),{type:blob.type||"image/jpeg"});
+          await navigator.share({text,files:[file]});
+        }else if(navigator.share){
+          await navigator.share({text});
+        }else{
+          window.open("https://api.whatsapp.com/send?text="+encodeURIComponent(text)," _blank");
         }
-      } catch(err){
+      }catch(err){
         if(err.name!=="AbortError"){
-          window.open("https://api.whatsapp.com/send?text="+encodeURIComponent(d.nombre),"_blank");
+          const text=`Hola, ${d.nombre}. Tu despacho fue enviado.`;
+          window.open("https://api.whatsapp.com/send?text="+encodeURIComponent(text),"_blank");
         }
       }
     };
@@ -786,33 +1262,45 @@ function bindDetalle(){
     if(!items) return;
     for(const item of items){
       if(item.type.startsWith("image/")){
+        e.preventDefault();
         guardarTicket(item.getAsFile());
         break;
       }
     }
   };
-
   document.addEventListener("paste",onPaste);
   window._pasteCleanup=()=>document.removeEventListener("paste",onPaste);
 }
 
+// ── GUARDAR TICKET ────────────────────────────────────────────────────────────
 function guardarTicket(file){
   if(!file) return;
+  const d=state.despachos.find(x=>x.id===state.selectedId);
+  if(!d) return;
 
+  showToast("Procesando ticket...");
   const reader=new FileReader();
-  reader.onload=ev=>{
-    const d=state.despachos.find(x=>x.id===state.selectedId);
-    if(!d) return;
 
-    if(state.useFirebase && d.fbKey){
-      window._db.ref("despachos/"+d.fbKey).update({ticketImg:ev.target.result});
-    } else {
-      state.despachos=state.despachos.map(x=>x.id===d.id?{...x,ticketImg:ev.target.result}:x);
-      saveLocal();
-      render();
-      setTimeout(bindDetalle,0);
+  reader.onload=async ev=>{
+    let tracking=d.tracking||"";
+    try{
+      const tData=await extractTicketData(file);
+      if(tData.tracking) tracking=tData.tracking;
+    }catch(err){
+      console.error("OCR ticket:",err);
     }
+
+    const nuevo={
+      ...d,
+      ticketImg:ev.target.result,
+      tracking,
+      historial:addHistory(d,"Ticket cargado",tracking?`Tracking detectado: ${tracking}`:"Se cargó ticket de entrega")
+    };
+
+    dbActualizar(nuevo);
+    showToast(tracking?`Ticket cargado · Tracking ${tracking}`:"Ticket cargado");
   };
+
   reader.readAsDataURL(file);
 }
 
@@ -823,7 +1311,7 @@ document.head.appendChild(t);
 
 if(window._firebaseReady){
   initStorage();
-} else {
+}else{
   window.addEventListener("firebaseReady",initStorage);
   setTimeout(initStorage,3000);
 }
