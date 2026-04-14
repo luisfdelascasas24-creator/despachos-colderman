@@ -86,7 +86,7 @@ const emptyForm=()=>({
   imgPreview:null,extracting:false,extractError:""
 });
 
-let state={despachos:[],view:"lista",selectedId:null,filtro:"todos",busqueda:"",filtroDia:"todos",filtroAgencia:"",form:emptyForm(),useFirebase:false};
+let state={despachos:[],view:"lista",selectedId:null,filtro:"todos",busqueda:"",filtroDia:"todos",filtroAgencia:"",filtroFecha:"",form:emptyForm(),useFirebase:false};
 
 // ── FIREBASE ──────────────────────────────────────────────────────────────────
 function initStorage(){
@@ -233,6 +233,10 @@ function renderLista(){
   const filtrados = (() => {
     let arr = state.filtro==="todos" ? state.despachos : state.despachos.filter(d=>d.estado===state.filtro);
     if (state.filtroDia==="hoy") arr=arr.filter(d=>d.fecha===hoy);
+    if (state.filtroFecha) {
+      const fechaSel=new Date(state.filtroFecha+"T00:00:00").toLocaleDateString("es-CL");
+      arr=arr.filter(d=>d.fecha===fechaSel);
+    }
     if (state.filtroAgencia) arr=arr.filter(d=>{
       const ag=d.agencia==="Otra..."?(d.agenciaCustom||"Otra"):d.agencia;
       return ag===state.filtroAgencia;
@@ -305,9 +309,14 @@ function renderLista(){
         📅 Hoy
       </button>
     </div>
-    <div style="padding:8px 16px 0;max-width:600px;margin:0 auto">
-      <select id="filtroAgencia" style="width:100%;background:#1a1a1a;border:1px solid ${state.filtroAgencia?"#e07b00":"#2a2a2a"};border-radius:10px;padding:10px 12px;color:${state.filtroAgencia?"#e07b00":"#888"};font-size:14px;outline:none">
-        <option value="">🚚 Filtrar por agencia...</option>
+    <div style="padding:8px 16px 0;max-width:600px;margin:0 auto;display:flex;gap:8px">
+      <div style="position:relative;flex:1">
+        <input type="date" id="filtroCalendario" value="${state.filtroFecha||""}"
+          style="width:100%;background:#1a1a1a;border:1px solid ${state.filtroFecha?"#e07b00":"#2a2a2a"};border-radius:10px;padding:10px 12px;color:${state.filtroFecha?"#e07b00":"#888"};font-size:14px;outline:none;cursor:pointer" />
+      </div>
+      ${state.filtroFecha?`<button id="btnLimpiarFecha" style="background:#1a1a1a;border:1px solid #333;color:#888;border-radius:10px;padding:10px 14px;font-size:13px;cursor:pointer;white-space:nowrap">✕ Limpiar</button>`:""}
+      <select id="filtroAgencia" style="flex:1;background:#1a1a1a;border:1px solid ${state.filtroAgencia?"#e07b00":"#2a2a2a"};border-radius:10px;padding:10px 12px;color:${state.filtroAgencia?"#e07b00":"#888"};font-size:13px;outline:none">
+        <option value="">🚚 Agencia...</option>
         ${AGENCIAS.filter(a=>a!=="Otra...").map(a=>`<option value="${a}" ${state.filtroAgencia===a?"selected":""}>${a}</option>`).join("")}
       </select>
     </div>
@@ -318,8 +327,11 @@ function bindLista(){
   Object.keys(ESTADOS).forEach(k=>{document.getElementById("cnt-"+k).onclick=()=>setState({filtro:state.filtro===k?"todos":k});});
   document.querySelectorAll(".card[data-id]").forEach(el=>{el.onclick=()=>setState({view:"detalle",selectedId:+el.dataset.id});});
   document.getElementById("searchInput").oninput=e=>{state.busqueda=e.target.value;render();setTimeout(bindLista,0);};
-  document.getElementById("btnHoy").onclick=()=>setState({filtroDia:state.filtroDia==="hoy"?"todos":"hoy"});
+  document.getElementById("btnHoy").onclick=()=>setState({filtroDia:state.filtroDia==="hoy"?"todos":"hoy",filtroFecha:""});
+  document.getElementById("filtroCalendario").onchange=e=>setState({filtroFecha:e.target.value,filtroDia:"todos"});
   document.getElementById("filtroAgencia").onchange=e=>setState({filtroAgencia:e.target.value});
+  const btnLimpiar=document.getElementById("btnLimpiarFecha");
+  if(btnLimpiar) btnLimpiar.onclick=()=>setState({filtroFecha:""});
 }
 
 // ── NUEVO ─────────────────────────────────────────────────────────────────────
