@@ -75,22 +75,34 @@ const ESTADOS={
   falta_doc:{label:"Falta documento",color:"#ef4444",bg:"#2a0000"},
 };
 
-const emptyForm=()=>({
+const emptyForm=() => ({
   nombre:"",rut:"",
-  tipoCompra:"importacion", // importacion | nacional
+  nDoc:"",bultos:"",
+  tipoCompra:"importacion",
   empresaNacional:"",empresaNacionalCustom:"",
-  destino:"provincia", // provincia | oficina | bodega
+  destino:"provincia",
   agencia:"",agenciaCustom:"",
   direccionDestino:"",region:"",
   notas:"",
   imgPreview:null,extracting:false,extractError:""
 });
 
-let state={despachos:[],view:"lista",selectedId:null,filtro:"todos",busqueda:"",filtroDia:"todos",filtroAgencia:"",filtroFecha:"",form:emptyForm(),useFirebase:false};
+let state={
+  despachos:[],
+  view:"lista",
+  selectedId:null,
+  filtro:"todos",
+  busqueda:"",
+  filtroDia:"todos",
+  filtroAgencia:"",
+  filtroFecha:"",
+  form:emptyForm(),
+  useFirebase:false
+};
 
 // ── FIREBASE ──────────────────────────────────────────────────────────────────
 function initStorage(){
-  if(window._firebaseReady&&window._db){
+  if(window._firebaseReady && window._db){
     state.useFirebase=true;
     window._db.ref("despachos").on("value",snap=>{
       const val=snap.val();
@@ -99,22 +111,46 @@ function initStorage(){
       render();
     });
   } else {
-    try{state.despachos=JSON.parse(localStorage.getItem("dcold")||"[]");}catch{state.despachos=[];}
+    try {
+      state.despachos=JSON.parse(localStorage.getItem("dcold")||"[]");
+    } catch {
+      state.despachos=[];
+    }
     render();
   }
 }
-function saveLocal(){localStorage.setItem("dcold",JSON.stringify(state.despachos));}
+
+function saveLocal(){
+  localStorage.setItem("dcold",JSON.stringify(state.despachos));
+}
+
 function dbGuardar(d){
-  if(state.useFirebase){window._db.ref("despachos").push(d);}
-  else{state.despachos=[d,...state.despachos];saveLocal();render();}
+  if(state.useFirebase){
+    window._db.ref("despachos").push(d);
+  } else {
+    state.despachos=[d,...state.despachos];
+    saveLocal();
+    render();
+  }
 }
+
 function dbEstado(id,fbKey,estado){
-  if(state.useFirebase&&fbKey){window._db.ref("despachos/"+fbKey).update({estado});}
-  else{state.despachos=state.despachos.map(d=>d.id===id?{...d,estado}:d);saveLocal();render();}
+  if(state.useFirebase && fbKey){
+    window._db.ref("despachos/"+fbKey).update({estado});
+  } else {
+    state.despachos=state.despachos.map(d=>d.id===id?{...d,estado}:d);
+    saveLocal();
+    render();
+  }
 }
+
 function dbEliminar(id,fbKey){
-  if(state.useFirebase&&fbKey){window._db.ref("despachos/"+fbKey).remove();}
-  else{state.despachos=state.despachos.filter(d=>d.id!==id);saveLocal();}
+  if(state.useFirebase && fbKey){
+    window._db.ref("despachos/"+fbKey).remove();
+  } else {
+    state.despachos=state.despachos.filter(d=>d.id!==id);
+    saveLocal();
+  }
   setState({view:"lista",selectedId:null});
 }
 
@@ -122,141 +158,183 @@ function dbEliminar(id,fbKey){
 function setState(p){
   if(window._pasteCleanup){window._pasteCleanup();window._pasteCleanup=null;}
   if(window._pasteNuevoCleanup){window._pasteNuevoCleanup();window._pasteNuevoCleanup=null;}
-  Object.assign(state,p);render();
+  Object.assign(state,p);
+  render();
 }
-function badge(e){const v=ESTADOS[e];return`<span class="badge" style="color:${v.color};border-color:${v.color};background:${v.bg}">${v.label}</span>`;}
-function counts(){return{pendiente:state.despachos.filter(d=>d.estado==="pendiente").length,entregado:state.despachos.filter(d=>d.estado==="entregado").length,falta_doc:state.despachos.filter(d=>d.estado==="falta_doc").length};}
-function getResumen(d){
-  const tc=d.tipoCompra==="importacion"?"🌏 Importación":"🇨🇱 Compra nacional";
-  let dest="";
-  if(d.destino==="provincia") dest=`📦 Provincia${d.region?" · "+d.region:""}`;
-  else if(d.destino==="oficina") dest="🏢 Oficina";
-  else dest="🏭 Bodega";
-  return tc+" · "+dest;
+
+function badge(e){
+  const v=ESTADOS[e];
+  return `<span class="badge" style="color:${v.color};border-color:${v.color};background:${v.bg}">${v.label}</span>`;
+}
+
+function counts(){
+  return {
+    pendiente:state.despachos.filter(d=>d.estado==="pendiente").length,
+    entregado:state.despachos.filter(d=>d.estado==="entregado").length,
+    falta_doc:state.despachos.filter(d=>d.estado==="falta_doc").length
+  };
 }
 
 // ── EXTRACCIÓN OCR ────────────────────────────────────────────────────────────
 async function handleFile(file){
-  if(!file)return;
-  state.form.extractError="";state.form.extracting=true;render();setTimeout(bindNuevo,0);
+  if(!file) return;
+
+  state.form.extractError="";
+  state.form.extracting=true;
+  render();
+  setTimeout(bindNuevo,0);
+
   const reader=new FileReader();
   reader.onload=async e=>{
     state.form.imgPreview=e.target.result;
-    // Usar Tesseract.js CDN para OCR gratuito
     try{
       const {createWorker}=Tesseract;
       const worker=await createWorker("spa");
       const {data:{text}}=await worker.recognize(file);
       await worker.terminate();
-      // Buscar nombre con múltiples variaciones de "SEÑORES"
-      const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-      let nombre = "";
-      for (let i = 0; i < lines.length; i++) {
-        const l = lines[i].toUpperCase();
-        if (/SE[NÑ]OR|SENOR|CLIENTE|DESTINATARIO|A NOMBRE/.test(l)) {
-          // Puede estar en la misma línea después de ":" o en la siguiente
-          const partes = lines[i].split(/:\s*/);
-          if (partes.length > 1 && partes[1].trim().length > 2) {
-            nombre = partes[1].trim();
-          } else if (i + 1 < lines.length) {
-            nombre = lines[i + 1].trim();
+
+      const lines=text.split("\n").map(l=>l.trim()).filter(l=>l.length>0);
+
+      let nombre="";
+      for(let i=0;i<lines.length;i++){
+        const l=lines[i].toUpperCase();
+        if(/SE[NÑ]OR|SENOR|CLIENTE|DESTINATARIO|A NOMBRE/.test(l)){
+          const partes=lines[i].split(/:\s*/);
+          if(partes.length>1 && partes[1].trim().length>2){
+            nombre=partes[1].trim();
+          } else if(i+1<lines.length){
+            nombre=lines[i+1].trim();
           }
           break;
         }
       }
-      console.log("=== TEXTO OCR ===\n" + text);
-      state.form.nombre = nombre;
-      // N° documento — busca "N°", "N.°", "Nº", "COTIZACION", "FACTURA"
-      const nDocMatch = text.match(/(?:N[°º\.]+|COTIZACI[OÓ]N\s*N[°º]?|FACTURA\s*N[°º]?)\s*[:\s]*(\d{3,6})/i);
-      state.form.nDoc = nDocMatch ? nDocMatch[1] : "";
-      // RUT — busca línea con RUT: primero, luego cualquier RUT en el texto
-      let rut = "";
-      for (let i = 0; i < lines.length; i++) {
-        const l = lines[i].toUpperCase();
-        if (/^RUT[:\s]/.test(l)) {
-          const m = lines[i].match(/(\d{1,2}[\.\d]*-[\dkK])/);
-          if (m) { rut = m[1]; break; }
+
+      state.form.nombre=nombre;
+
+      const nDocMatch=text.match(/(?:N[°º\.]+|COTIZACI[OÓ]N\s*N[°º]?|FACTURA\s*N[°º]?)\s*[:\s]*(\d{3,6})/i);
+      state.form.nDoc=nDocMatch ? nDocMatch[1] : "";
+
+      let rut="";
+      for(let i=0;i<lines.length;i++){
+        const l=lines[i].toUpperCase();
+        if(/^RUT[:\s]/.test(l)){
+          const m=lines[i].match(/(\d{1,2}[\.\d]*-[\dkK])/);
+          if(m){ rut=m[1]; break; }
         }
       }
-      if (!rut) {
-        const m = text.match(/\b(\d{1,2}\.\d{3}\.\d{3}-[\dkK])\b/);
-        if (m) rut = m[1];
+      if(!rut){
+        const m=text.match(/\b(\d{1,2}\.\d{3}\.\d{3}-[\dkK])\b/);
+        if(m) rut=m[1];
       }
-      state.form.rut = rut;
+      state.form.rut=rut;
+
       state.form.extracting=false;
-      if(!state.form.nombre&&!state.form.rut) state.form.extractError="No se pudo extraer. Rellena manualmente.";
-    }catch{
+      if(!state.form.nombre && !state.form.rut){
+        state.form.extractError="No se pudo extraer. Rellena manualmente.";
+      }
+    } catch {
       state.form.extracting=false;
       state.form.extractError="No se pudo extraer. Rellena manualmente.";
     }
-    render();setTimeout(bindNuevo,0);
+
+    render();
+    setTimeout(bindNuevo,0);
   };
+
   reader.readAsDataURL(file);
 }
 
 // ── GUARDAR ───────────────────────────────────────────────────────────────────
 function guardar(){
   const f=state.form;
-  if(!f.nombre.trim())return;
+  if(!f.nombre.trim()) return;
+
   dbGuardar({
-    id:Date.now(),ts:Date.now(),
-    nombre:f.nombre.trim(),rut:f.rut.trim(),
-    nDoc:f.nDoc.trim(),bultos:f.bultos,
-    docImg:f.imgPreview||"",
+    id:Date.now(),
+    ts:Date.now(),
+    nombre:f.nombre.trim(),
+    rut:f.rut.trim(),
+    nDoc:(f.nDoc||"").trim(),
+    bultos:f.bultos || "",
+    docImg:f.imgPreview || "",
     tipoCompra:f.tipoCompra,
     empresaNacional:f.empresaNacional,
     empresaNacionalCustom:f.empresaNacionalCustom.trim(),
     destino:f.destino,
-    agencia:f.agencia,agenciaCustom:f.agenciaCustom.trim(),
+    agencia:f.agencia,
+    agenciaCustom:f.agenciaCustom.trim(),
     direccionDestino:f.direccionDestino.trim(),
-    region:f.region,notas:f.notas.trim(),
+    region:f.region,
+    notas:f.notas.trim(),
     estado:"pendiente",
     fecha:new Date().toLocaleDateString("es-CL"),
   });
+
   setState({view:"lista",form:emptyForm()});
 }
 
 // ── RENDER ────────────────────────────────────────────────────────────────────
 function render(){
   const app=document.getElementById("app");
-  if(state.view==="nuevo"){app.innerHTML=renderNuevo();bindNuevo();return;}
-  if(state.view==="detalle"){app.innerHTML=renderDetalle();bindDetalle();return;}
-  app.innerHTML=renderLista();bindLista();
+  if(state.view==="nuevo"){
+    app.innerHTML=renderNuevo();
+    bindNuevo();
+    return;
+  }
+  if(state.view==="detalle"){
+    app.innerHTML=renderDetalle();
+    bindDetalle();
+    return;
+  }
+  app.innerHTML=renderLista();
+  bindLista();
 }
 
 // ── LISTA ─────────────────────────────────────────────────────────────────────
 function renderLista(){
   const c=counts();
   const hoy=new Date().toLocaleDateString("es-CL");
-  const pendientesAtrasados=state.despachos.filter(d=>d.estado==="pendiente"&&d.fecha!==hoy);
-  
-  const filtrados = (() => {
-    let arr = state.filtro==="todos" ? state.despachos : state.despachos.filter(d=>d.estado===state.filtro);
-    if (state.filtroDia==="hoy") arr=arr.filter(d=>d.fecha===hoy);
-    if (state.filtroFecha) {
+  const pendientesAtrasados=state.despachos.filter(d=>d.estado==="pendiente" && d.fecha!==hoy);
+
+  const filtrados=(()=>{
+    let arr=state.filtro==="todos"
+      ? state.despachos
+      : state.despachos.filter(d=>d.estado===state.filtro);
+
+    if(state.filtroDia==="hoy") arr=arr.filter(d=>d.fecha===hoy);
+
+    if(state.filtroFecha){
       const fechaSel=new Date(state.filtroFecha+"T00:00:00").toLocaleDateString("es-CL");
       arr=arr.filter(d=>d.fecha===fechaSel);
     }
-    if (state.filtroAgencia) arr=arr.filter(d=>{
-      const ag=d.agencia==="Otra..."?(d.agenciaCustom||"Otra"):d.agencia;
-      return ag===state.filtroAgencia;
-    });
-    if (state.busqueda.trim()) {
-      const q = state.busqueda.toLowerCase().trim();
-      arr = arr.filter(d => [d.nombre,d.rut,d.nDoc,d.agencia,d.agenciaCustom,d.direccionDestino,d.empresaNacional,d.empresaNacionalCustom,d.notas]
-        .some(v => v && v.toLowerCase().includes(q)));
+
+    if(state.filtroAgencia){
+      arr=arr.filter(d=>{
+        const ag=d.agencia==="Otra..." ? (d.agenciaCustom||"Otra") : d.agencia;
+        return ag===state.filtroAgencia;
+      });
     }
+
+    if(state.busqueda.trim()){
+      const q=state.busqueda.toLowerCase().trim();
+      arr=arr.filter(d=>
+        [d.nombre,d.rut,d.nDoc,d.agencia,d.agenciaCustom,d.direccionDestino,d.empresaNacional,d.empresaNacionalCustom,d.notas]
+          .some(v=>v && String(v).toLowerCase().includes(q))
+      );
+    }
+
     return arr;
   })();
 
   const cards=filtrados.length===0
-    ?`<div class="empty">${state.despachos.length===0?"No hay despachos. Agrega el primero.":"Sin resultados."}</div>`
-    :filtrados.map(d=>{
-      const agenciaLabel=d.agencia==="Otra..."?(d.agenciaCustom||"Otra"):d.agencia;
-      const empresaLabel=d.empresaNacional==="Otra..."?(d.empresaNacionalCustom||"Otra"):d.empresaNacional;
-      const destinoLabel=d.destino==="provincia"?"📦 Provincia":d.destino==="oficina"?"🏢 Oficina":"🏭 Bodega";
-      const atrasado=d.estado==="pendiente"&&d.fecha!==hoy;
-      return`
+    ? `<div class="empty">${state.despachos.length===0?"No hay despachos. Agrega el primero.":"Sin resultados."}</div>`
+    : filtrados.map(d=>{
+      const agenciaLabel=d.agencia==="Otra..." ? (d.agenciaCustom||"Otra") : d.agencia;
+      const empresaLabel=d.empresaNacional==="Otra..." ? (d.empresaNacionalCustom||"Otra") : d.empresaNacional;
+      const destinoLabel=d.destino==="provincia" ? "📦 Provincia" : d.destino==="oficina" ? "🏢 Oficina" : "🏭 Bodega";
+      const atrasado=d.estado==="pendiente" && d.fecha!==hoy;
+
+      return `
       <div class="card" data-id="${d.id}" style="border-color:${atrasado?"#ef444455":"#2a2a2a"}">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
           <div style="flex:1;min-width:0">
@@ -280,7 +358,7 @@ function renderLista(){
       </div>`;
     }).join("");
 
-  return`
+  return `
     <div class="header">
       <div>
         <div style="font-weight:700;font-size:17px">📦 Despachos Colderman</div>
@@ -288,10 +366,12 @@ function renderLista(){
       </div>
       <button class="btn-primary" id="btnNuevo">+ Nuevo</button>
     </div>
-    ${pendientesAtrasados.length>0?`
+
+    ${pendientesAtrasados.length>0 ? `
     <div style="background:#2a0000;border-left:3px solid #ef4444;padding:10px 16px;font-size:13px;color:#ef4444;display:flex;align-items:center;gap:8px">
       ⚠️ Tienes <strong>${pendientesAtrasados.length}</strong> despacho${pendientesAtrasados.length>1?"s":""} pendiente${pendientesAtrasados.length>1?"s":""} de días anteriores
-    </div>`:""}
+    </div>` : ""}
+
     <div class="counters">
       ${Object.entries(ESTADOS).map(([k,v])=>`
         <div class="counter" id="cnt-${k}" style="border-color:${state.filtro===k?v.color:"#2a2a2a"};background:${state.filtro===k?v.bg:"#1a1a1a"}">
@@ -299,16 +379,18 @@ function renderLista(){
           <div class="lbl">${v.label}</div>
         </div>`).join("")}
     </div>
+
     <div style="padding:8px 16px 0;max-width:600px;margin:0 auto;display:flex;gap:8px;align-items:center">
       <div style="position:relative;flex:1">
         <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#555;font-size:16px">🔍</span>
-        <input id="searchInput" value="${state.busqueda||""}" placeholder="Buscar nombre, RUT, N° doc..." 
+        <input id="searchInput" value="${state.busqueda||""}" placeholder="Buscar nombre, RUT, N° doc..."
           style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:10px;padding:10px 12px 10px 36px;color:#fff;font-size:14px;outline:none" />
       </div>
       <button id="btnHoy" style="background:${state.filtroDia==="hoy"?"#e07b00":"#1a1a1a"};border:1px solid ${state.filtroDia==="hoy"?"#e07b00":"#333"};color:${state.filtroDia==="hoy"?"#fff":"#888"};border-radius:10px;padding:10px 14px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">
         📅 Hoy
       </button>
     </div>
+
     <div style="padding:8px 16px 0;max-width:600px;margin:0 auto;display:flex;gap:8px">
       <div style="position:relative;flex:1">
         <input type="date" id="filtroCalendario" value="${state.filtroFecha||""}"
@@ -320,108 +402,162 @@ function renderLista(){
         ${AGENCIAS.filter(a=>a!=="Otra...").map(a=>`<option value="${a}" ${state.filtroAgencia===a?"selected":""}>${a}</option>`).join("")}
       </select>
     </div>
+
     <div style="display:flex;gap:12px;align-items:flex-start;max-width:960px;margin:0 auto;padding:12px 16px 0">
       <div style="flex:1;min-width:0">
         ${cards}
       </div>
+
       <div style="width:160px;flex-shrink:0;display:flex;flex-direction:column;gap:8px">
         <div style="font-size:11px;color:#555;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px">Resumen hoy</div>
         ${(()=>{
-          const hoyStr=new Date().toLocaleDateString("es-CL");
           const pendHoy=state.despachos.filter(d=>d.estado==="pendiente");
-          // contar por agencia
           const conteo={};
+
           pendHoy.forEach(d=>{
-            const key=d.destino==="bodega"?"🏭 Bodega":d.destino==="oficina"?"🏢 Oficina":(d.agencia==="Otra..."?(d.agenciaCustom||"Otra"):d.agencia)||"Sin agencia";
+            const key=d.destino==="bodega"
+              ? "🏭 Bodega"
+              : d.destino==="oficina"
+                ? "🏢 Oficina"
+                : (d.agencia==="Otra..." ? (d.agenciaCustom||"Otra") : d.agencia) || "Sin agencia";
             conteo[key]=(conteo[key]||0)+1;
           });
-          if(Object.keys(conteo).length===0) return`<div style="font-size:12px;color:#555;text-align:center;padding:10px 0">Sin pendientes</div>`;
-          return Object.entries(conteo).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`
-            <div class="resumen-item" data-agencia="${k}"
-              style="background:${state.filtroAgencia===k?"#2a1f00":"#1a1a1a"};border:1px solid ${state.filtroAgencia===k?"#e07b00":"#2a2a2a"};border-radius:10px;padding:8px 10px;cursor:pointer;display:flex;justify-content:space-between;align-items:center">
-              <span style="font-size:12px;color:#ccc;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${k}</span>
-              <span style="font-size:14px;font-weight:700;color:#e07b00;margin-left:6px">${v}</span>
-            </div>`).join("");
+
+          if(Object.keys(conteo).length===0){
+            return `<div style="font-size:12px;color:#555;text-align:center;padding:10px 0">Sin pendientes</div>`;
+          }
+
+          return Object.entries(conteo)
+            .sort((a,b)=>b[1]-a[1])
+            .map(([k,v])=>`
+              <div class="resumen-item" data-agencia="${k}"
+                style="background:${state.filtroAgencia===k?"#2a1f00":"#1a1a1a"};border:1px solid ${state.filtroAgencia===k?"#e07b00":"#2a2a2a"};border-radius:10px;padding:8px 10px;cursor:pointer;display:flex;justify-content:space-between;align-items:center">
+                <span style="font-size:12px;color:#ccc;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${k}</span>
+                <span style="font-size:14px;font-weight:700;color:#e07b00;margin-left:6px">${v}</span>
+              </div>`).join("");
         })()}
         ${state.filtroAgencia?`<button id="btnLimpiarResumen" style="background:none;border:1px solid #333;border-radius:8px;padding:6px;color:#666;font-size:11px;cursor:pointer">✕ Limpiar filtro</button>`:""}
       </div>
-    </div>
+    </div>`;
 }
+
 function bindLista(){
   document.getElementById("btnNuevo").onclick=()=>setState({view:"nuevo",form:emptyForm()});
-  Object.keys(ESTADOS).forEach(k=>{document.getElementById("cnt-"+k).onclick=()=>setState({filtro:state.filtro===k?"todos":k});});
-  document.querySelectorAll(".card[data-id]").forEach(el=>{el.onclick=()=>setState({view:"detalle",selectedId:+el.dataset.id});});
-  document.getElementById("searchInput").oninput=e=>{state.busqueda=e.target.value;render();setTimeout(bindLista,0);};
-  document.getElementById("btnHoy").onclick=()=>setState({filtroDia:state.filtroDia==="hoy"?"todos":"hoy",filtroFecha:""});
-  document.getElementById("filtroCalendario").onchange=e=>setState({filtroFecha:e.target.value,filtroDia:"todos"});
-  document.getElementById("filtroAgencia").onchange=e=>setState({filtroAgencia:e.target.value});
+
+  Object.keys(ESTADOS).forEach(k=>{
+    document.getElementById("cnt-"+k).onclick=()=>setState({filtro:state.filtro===k?"todos":k});
+  });
+
+  document.querySelectorAll(".card[data-id]").forEach(el=>{
+    el.onclick=()=>setState({view:"detalle",selectedId:+el.dataset.id});
+  });
+
+  document.getElementById("searchInput").oninput=e=>{
+    state.busqueda=e.target.value;
+    render();
+    setTimeout(bindLista,0);
+  };
+
+  document.getElementById("btnHoy").onclick=()=>setState({
+    filtroDia:state.filtroDia==="hoy"?"todos":"hoy",
+    filtroFecha:""
+  });
+
+  document.getElementById("filtroCalendario").onchange=e=>setState({
+    filtroFecha:e.target.value,
+    filtroDia:"todos"
+  });
+
+  document.getElementById("filtroAgencia").onchange=e=>setState({
+    filtroAgencia:e.target.value
+  });
+
   document.querySelectorAll(".resumen-item").forEach(el=>{
     el.onclick=()=>{
       const ag=el.dataset.agencia;
-      if(ag==="🏭 Bodega") setState({filtroAgencia:"",filtro:"todos"});
-      else if(ag==="🏢 Oficina") setState({filtroAgencia:"",filtro:"todos"});
-      else setState({filtroAgencia:state.filtroAgencia===ag?"":ag});
+      if(ag==="🏭 Bodega" || ag==="🏢 Oficina"){
+        setState({filtroAgencia:"",filtro:"todos"});
+      } else {
+        setState({filtroAgencia:state.filtroAgencia===ag?"":ag});
+      }
     };
   });
+
   const btnLR=document.getElementById("btnLimpiarResumen");
   if(btnLR) btnLR.onclick=()=>setState({filtroAgencia:""});
+
+  const btnLF=document.getElementById("btnLimpiarFecha");
+  if(btnLF) btnLF.onclick=()=>setState({filtroFecha:""});
 }
 
 // ── NUEVO ─────────────────────────────────────────────────────────────────────
 function renderNuevo(){
   const f=state.form;
   const isNacional=f.tipoCompra==="nacional";
-  const showEmpresaCustom=isNacional&&f.empresaNacional==="Otra...";
+  const showEmpresaCustom=isNacional && f.empresaNacional==="Otra...";
   const isProvincia=f.destino==="provincia";
-  const showAgenciaCustom=isProvincia&&f.agencia==="Otra...";
-  return`
+  const showAgenciaCustom=isProvincia && f.agencia==="Otra...";
+
+  return `
     <div class="header">
       <button class="btn-back" id="btnBack">←</button>
       <span style="font-weight:700;font-size:16px">Nuevo Despacho</span>
       <div style="width:40px"></div>
     </div>
-    <div class="page">
 
-      <!-- UPLOAD -->
+    <div class="page">
       <div class="upload-area" id="uploadArea">
         ${f.imgPreview
-          ?`<img src="${f.imgPreview}" alt="doc" />`
-          :`<div style="font-size:30px">📎</div><div style="color:#888;font-size:13px;margin-top:6px">Toca para subir pantallazo de factura o cotización</div>`}
+          ? `<img src="${f.imgPreview}" alt="doc" />`
+          : `<div style="font-size:30px">📎</div><div style="color:#888;font-size:13px;margin-top:6px">Toca para subir pantallazo de factura o cotización</div>`}
       </div>
+
       <input type="file" id="fileInput" accept="image/*" style="display:none" />
       ${f.extracting?`<div class="extracting">⏳ Extrayendo datos...</div>`:""}
       ${f.extractError?`<div class="extract-error">${f.extractError}</div>`:""}
 
-      <!-- DATOS CLIENTE -->
-      <div class="field"><label>Nombre del cliente / empresa *</label>
-        <input id="fNombre" value="${f.nombre}" placeholder="Extraído o escribe aquí" /></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div class="field"><label>RUT</label>
-          <input id="fRut" value="${f.rut}" placeholder="Ej: 12.345.678-9" /></div>
-        <div class="field"><label>N° Cotización / Factura</label>
-          <input id="fNDoc" value="${f.nDoc}" placeholder="Ej: 5065" /></div>
+      <div class="field">
+        <label>Nombre del cliente / empresa *</label>
+        <input id="fNombre" value="${f.nombre}" placeholder="Extraído o escribe aquí" />
       </div>
-      <div class="field"><label>Cantidad de bultos</label>
-        <input id="fBultos" type="number" min="1" value="${f.bultos}" placeholder="Ej: 3" /></div>
 
-      <!-- TIPO COMPRA -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="field">
+          <label>RUT</label>
+          <input id="fRut" value="${f.rut}" placeholder="Ej: 12.345.678-9" />
+        </div>
+        <div class="field">
+          <label>N° Cotización / Factura</label>
+          <input id="fNDoc" value="${f.nDoc||""}" placeholder="Ej: 5065" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Cantidad de bultos</label>
+        <input id="fBultos" type="number" min="1" value="${f.bultos||""}" placeholder="Ej: 3" />
+      </div>
+
       <div class="section-sep">Tipo de compra</div>
       <div class="tabs">
         <div class="tab ${!isNacional?"active":""}" id="tabImport">🌏 Importación</div>
         <div class="tab ${isNacional?"active":""}" id="tabNacional">🇨🇱 Compra nacional</div>
       </div>
 
-      ${isNacional?`
-        <div class="field"><label>Empresa proveedora</label>
+      ${isNacional ? `
+        <div class="field">
+          <label>Empresa proveedora</label>
           <select id="fEmpresaNacional">
             <option value="">Seleccionar empresa...</option>
             ${EMPRESAS_NACIONAL.map(e=>`<option ${f.empresaNacional===e?"selected":""}>${e}</option>`).join("")}
-          </select></div>
-        ${showEmpresaCustom?`<div class="field"><label>¿Cuál empresa?</label>
-          <input id="fEmpresaCustom" value="${f.empresaNacionalCustom}" placeholder="Nombre de la empresa" /></div>`:""}
-      `:""}
+          </select>
+        </div>
+        ${showEmpresaCustom ? `
+          <div class="field">
+            <label>¿Cuál empresa?</label>
+            <input id="fEmpresaCustom" value="${f.empresaNacionalCustom}" placeholder="Nombre de la empresa" />
+          </div>` : ""}
+      ` : ""}
 
-      <!-- DESTINO -->
       <div class="section-sep">Destino del envío</div>
       <div class="tabs">
         <div class="tab ${isProvincia?"active":""}" id="tabProvincia">📦 Provincia</div>
@@ -429,35 +565,53 @@ function renderNuevo(){
         <div class="tab ${f.destino==="bodega"?"active":""}" id="tabBodega">🏭 Bodega</div>
       </div>
 
-      ${isProvincia?`
-        <div class="field"><label>Agencia de envío</label>
+      ${isProvincia ? `
+        <div class="field">
+          <label>Agencia de envío</label>
           <select id="fAgencia">
             <option value="">Seleccionar agencia...</option>
             ${AGENCIAS.map(a=>`<option ${f.agencia===a?"selected":""}>${a}</option>`).join("")}
-          </select></div>
-        ${showAgenciaCustom?`<div class="field"><label>¿Cuál agencia?</label>
-          <input id="fAgenciaCustom" value="${f.agenciaCustom}" placeholder="Nombre de la agencia" /></div>`:""}
-        <div class="field"><label>Dirección / sucursal de destino</label>
-          <input id="fDireccion" value="${f.direccionDestino}" placeholder="Ej: Sucursal Starken Talca, Av. O'Higgins 123" /></div>
-      `:`<div style="background:#1a1a1a;border-radius:10px;padding:12px;margin-bottom:14px;font-size:13px;color:#888">
-          ${f.destino==="oficina"?"🏢 El pedido se recibe en oficina.":"🏭 El pedido se recoge en bodega."}
-        </div>`}
+          </select>
+        </div>
 
-      <div class="field"><label>Notas adicionales</label>
-        <textarea id="fNotas" rows="2" placeholder="Observaciones...">${f.notas}</textarea></div>
+        ${showAgenciaCustom ? `
+          <div class="field">
+            <label>¿Cuál agencia?</label>
+            <input id="fAgenciaCustom" value="${f.agenciaCustom}" placeholder="Nombre de la agencia" />
+          </div>` : ""}
+
+        <div class="field">
+          <label>Dirección / sucursal de destino</label>
+          <input id="fDireccion" value="${f.direccionDestino}" placeholder="Ej: Sucursal Starken Talca, Av. O'Higgins 123" />
+        </div>
+      ` : `
+        <div style="background:#1a1a1a;border-radius:10px;padding:12px;margin-bottom:14px;font-size:13px;color:#888">
+          ${f.destino==="oficina"?"🏢 El pedido se recibe en oficina.":"🏭 El pedido se recoge en bodega."}
+        </div>
+      `}
+
+      <div class="field">
+        <label>Notas adicionales</label>
+        <textarea id="fNotas" rows="2" placeholder="Observaciones...">${f.notas}</textarea>
+      </div>
+
       <button class="btn-primary" id="btnGuardar" style="width:100%;padding:14px;font-size:16px;margin-bottom:24px">Guardar despacho</button>
     </div>`;
 }
+
 function bindNuevo(){
-  const re=()=>{render();setTimeout(bindNuevo,0);};
+  const re=()=>{
+    render();
+    setTimeout(bindNuevo,0);
+  };
+
   document.getElementById("btnBack").onclick=()=>setState({view:"lista",form:emptyForm()});
   document.getElementById("uploadArea").onclick=()=>document.getElementById("fileInput").click();
   document.getElementById("fileInput").onchange=e=>handleFile(e.target.files[0]);
 
-  // Pegar con Ctrl+V
   const onPasteNuevo=e=>{
     const items=e.clipboardData?.items;
-    if(!items)return;
+    if(!items) return;
     for(const item of items){
       if(item.type.startsWith("image/")){
         e.preventDefault();
@@ -466,52 +620,58 @@ function bindNuevo(){
       }
     }
   };
+
   document.addEventListener("paste",onPasteNuevo);
   window._pasteNuevoCleanup=()=>document.removeEventListener("paste",onPasteNuevo);
 
-  // También activar paste al hacer click en el área
-  document.getElementById("uploadArea").addEventListener("keydown",e=>{
-    if((e.ctrlKey||e.metaKey)&&e.key==="v") document.getElementById("uploadArea").focus();
-  });
   document.getElementById("fNombre").oninput=e=>{state.form.nombre=e.target.value;};
   document.getElementById("fRut").oninput=e=>{state.form.rut=e.target.value;};
   document.getElementById("fNDoc").oninput=e=>{state.form.nDoc=e.target.value;};
   document.getElementById("fBultos").oninput=e=>{state.form.bultos=e.target.value;};
+
   document.getElementById("tabImport").onclick=()=>{state.form.tipoCompra="importacion";re();};
   document.getElementById("tabNacional").onclick=()=>{state.form.tipoCompra="nacional";re();};
   document.getElementById("tabProvincia").onclick=()=>{state.form.destino="provincia";re();};
   document.getElementById("tabOficina").onclick=()=>{state.form.destino="oficina";re();};
   document.getElementById("tabBodega").onclick=()=>{state.form.destino="bodega";re();};
+
   const fn=document.getElementById("fEmpresaNacional");
-  if(fn)fn.onchange=e=>{state.form.empresaNacional=e.target.value;re();};
+  if(fn) fn.onchange=e=>{state.form.empresaNacional=e.target.value;re();};
+
   const fc=document.getElementById("fEmpresaCustom");
-  if(fc)fc.oninput=e=>{state.form.empresaNacionalCustom=e.target.value;};
+  if(fc) fc.oninput=e=>{state.form.empresaNacionalCustom=e.target.value;};
+
   const fa=document.getElementById("fAgencia");
-  if(fa)fa.onchange=e=>{state.form.agencia=e.target.value;re();};
+  if(fa) fa.onchange=e=>{state.form.agencia=e.target.value;re();};
+
   const fac=document.getElementById("fAgenciaCustom");
-  if(fac)fac.oninput=e=>{state.form.agenciaCustom=e.target.value;};
+  if(fac) fac.oninput=e=>{state.form.agenciaCustom=e.target.value;};
+
   const fd=document.getElementById("fDireccion");
-  if(fd)fd.oninput=e=>{state.form.direccionDestino=e.target.value;};
-  const fr=document.getElementById("fRegion");
-  if(fr)fr.onchange=e=>{state.form.region=e.target.value;};
+  if(fd) fd.oninput=e=>{state.form.direccionDestino=e.target.value;};
+
   const fno=document.getElementById("fNotas");
-  if(fno)fno.oninput=e=>{state.form.notas=e.target.value;};
+  if(fno) fno.oninput=e=>{state.form.notas=e.target.value;};
+
   document.getElementById("btnGuardar").onclick=guardar;
 }
 
 // ── DETALLE ───────────────────────────────────────────────────────────────────
 function renderDetalle(){
   const d=state.despachos.find(x=>x.id===state.selectedId);
-  if(!d)return renderLista();
-  const empresaLabel=d.empresaNacional==="Otra..."?(d.empresaNacionalCustom||"Otra"):d.empresaNacional;
-  const agenciaLabel=d.agencia==="Otra..."?(d.agenciaCustom||"Otra"):d.agencia;
-  const destinoLabel=d.destino==="provincia"?"📦 Envío a provincia":d.destino==="oficina"?"🏢 Recepción en oficina":"🏭 Recojo en bodega";
-  return`
+  if(!d) return renderLista();
+
+  const empresaLabel=d.empresaNacional==="Otra..." ? (d.empresaNacionalCustom||"Otra") : d.empresaNacional;
+  const agenciaLabel=d.agencia==="Otra..." ? (d.agenciaCustom||"Otra") : d.agencia;
+  const destinoLabel=d.destino==="provincia" ? "📦 Envío a provincia" : d.destino==="oficina" ? "🏢 Recepción en oficina" : "🏭 Recojo en bodega";
+
+  return `
     <div class="header">
       <button class="btn-back" id="btnBack">←</button>
       <span style="font-weight:700;font-size:16px">Detalle</span>
       <button class="btn-delete" id="btnDelete">🗑</button>
     </div>
+
     <div class="page">
       <div style="background:#1a1a1a;border-radius:14px;padding:20px;margin-bottom:16px">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
@@ -521,6 +681,7 @@ function renderDetalle(){
           </div>
           ${badge(d.estado)}
         </div>
+
         <div class="row"><span class="lbl">Tipo</span><span class="val">${d.tipoCompra==="importacion"?"🌏 Importación":"🇨🇱 Compra nacional"}</span></div>
         ${empresaLabel?`<div class="row"><span class="lbl">Empresa</span><span class="val">${empresaLabel}</span></div>`:""}
         <div class="row"><span class="lbl">Destino</span><span class="val">${destinoLabel}</span></div>
@@ -530,10 +691,11 @@ function renderDetalle(){
         ${d.notas?`<div class="row"><span class="lbl">Notas</span><span class="val">${d.notas}</span></div>`:""}
         <div class="row"><span class="lbl">Ingresado</span><span class="val">${d.fecha}</span></div>
       </div>
+
       <div style="font-size:13px;color:#aaa;font-weight:600;margin:16px 0 10px">DOCUMENTO</div>
       ${d.docImg
-        ?`<img src="${d.docImg}" id="docMiniatura" style="width:100%;max-height:120px;object-fit:cover;border-radius:12px;margin-bottom:16px;cursor:pointer" title="Toca para ver completo" />`
-        :`<div style="color:#555;font-size:13px;margin-bottom:16px">Sin documento adjunto.</div>`}
+        ? `<img src="${d.docImg}" id="docMiniatura" style="width:100%;max-height:120px;object-fit:cover;border-radius:12px;margin-bottom:16px;cursor:pointer" title="Toca para ver completo" />`
+        : `<div style="color:#555;font-size:13px;margin-bottom:16px">Sin documento adjunto.</div>`}
 
       <div style="font-size:13px;color:#aaa;font-weight:600;margin-bottom:10px">CAMBIAR ESTADO</div>
       ${Object.entries(ESTADOS).map(([k,v])=>`
@@ -541,9 +703,10 @@ function renderDetalle(){
           style="color:${v.color};border-color:${d.estado===k?v.color:"#333"};background:${d.estado===k?v.bg:"#1a1a1a"}">
           ${d.estado===k?"✓ ":""}${v.label}
         </button>`).join("")}
+
       <div style="font-size:13px;color:#aaa;font-weight:600;margin:16px 0 10px">TICKET DE ENTREGA</div>
       ${d.ticketImg
-        ?`<img src="${d.ticketImg}" style="width:100%;border-radius:12px;margin-bottom:10px" id="ticketImgEl" />
+        ? `<img src="${d.ticketImg}" style="width:100%;border-radius:12px;margin-bottom:10px" id="ticketImgEl" />
            <div style="display:flex;gap:8px;margin-bottom:10px">
              <button id="btnWhatsapp"
                style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;background:#25D366;color:#fff;border-radius:10px;padding:12px;font-weight:700;font-size:14px;border:none;cursor:pointer">
@@ -554,28 +717,35 @@ function renderDetalle(){
                ⬇️ Descargar
              </a>
            </div>`
-        :`<div style="color:#555;font-size:13px;margin-bottom:10px">No hay foto del ticket aún.</div>`}
+        : `<div style="color:#555;font-size:13px;margin-bottom:10px">No hay foto del ticket aún.</div>`}
+
       <div class="upload-area" id="ticketUpload" style="margin-bottom:8px">
         <div style="font-size:24px">📷</div>
         <div style="color:#888;font-size:13px;margin-top:4px">${d.ticketImg?"Cambiar foto del ticket":"Subir foto del ticket"}</div>
       </div>
-      <div style="text-align:center;font-size:12px;color:#555;margin-bottom:24px">o pega una imagen con <kbd style="background:#252525;border:1px solid #333;border-radius:4px;padding:1px 5px">Ctrl+V</kbd></div>
+
+      <div style="text-align:center;font-size:12px;color:#555;margin-bottom:24px">
+        o pega una imagen con <kbd style="background:#252525;border:1px solid #333;border-radius:4px;padding:1px 5px">Ctrl+V</kbd>
+      </div>
+
       <input type="file" id="ticketFileInput" accept="image/*" style="display:none" />
     </div>`;
 }
+
 function bindDetalle(){
   const d=state.despachos.find(x=>x.id===state.selectedId);
+
   document.getElementById("btnBack").onclick=()=>setState({view:"lista"});
   document.getElementById("btnDelete").onclick=()=>{
-    if(confirm("¿Eliminar este despacho?"))dbEliminar(state.selectedId,d?.fbKey);
+    if(confirm("¿Eliminar este despacho?")) dbEliminar(state.selectedId,d?.fbKey);
   };
+
   document.querySelectorAll(".btn-estado").forEach(btn=>{
     btn.onclick=()=>dbEstado(state.selectedId,btn.dataset.fbkey,btn.dataset.estado);
   });
 
-  // Miniatura documento — abrir en grande al tocar
   const docMini=document.getElementById("docMiniatura");
-  if(docMini&&d?.docImg){
+  if(docMini && d?.docImg){
     docMini.onclick=()=>{
       const overlay=document.createElement("div");
       overlay.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px";
@@ -584,8 +754,9 @@ function bindDetalle(){
       document.body.appendChild(overlay);
     };
   }
+
   const btnWa=document.getElementById("btnWhatsapp");
-  if(btnWa&&d){
+  if(btnWa && d){
     btnWa.onclick=async(e)=>{
       e.preventDefault();
       try{
@@ -599,20 +770,20 @@ function bindDetalle(){
         } else {
           window.open("https://api.whatsapp.com/send?text="+encodeURIComponent(d.nombre),"_blank");
         }
-      }catch(err){
-        if(err.name!=="AbortError") window.open("https://api.whatsapp.com/send?text="+encodeURIComponent(d.nombre),"_blank");
+      } catch(err){
+        if(err.name!=="AbortError"){
+          window.open("https://api.whatsapp.com/send?text="+encodeURIComponent(d.nombre),"_blank");
+        }
       }
     };
   }
 
-  // Subir ticket por archivo
   document.getElementById("ticketUpload").onclick=()=>document.getElementById("ticketFileInput").click();
   document.getElementById("ticketFileInput").onchange=e=>guardarTicket(e.target.files[0]);
 
-  // Pegar con Ctrl+V
   const onPaste=e=>{
     const items=e.clipboardData?.items;
-    if(!items)return;
+    if(!items) return;
     for(const item of items){
       if(item.type.startsWith("image/")){
         guardarTicket(item.getAsFile());
@@ -620,35 +791,42 @@ function bindDetalle(){
       }
     }
   };
+
   document.addEventListener("paste",onPaste);
-  // Limpiar listener al salir
   window._pasteCleanup=()=>document.removeEventListener("paste",onPaste);
 }
 
 function guardarTicket(file){
-  if(!file)return;
+  if(!file) return;
+
   const reader=new FileReader();
   reader.onload=ev=>{
     const d=state.despachos.find(x=>x.id===state.selectedId);
-    if(!d)return;
-    if(state.useFirebase&&d.fbKey){
+    if(!d) return;
+
+    if(state.useFirebase && d.fbKey){
       window._db.ref("despachos/"+d.fbKey).update({ticketImg:ev.target.result});
     } else {
       state.despachos=state.despachos.map(x=>x.id===d.id?{...x,ticketImg:ev.target.result}:x);
-      saveLocal();render();setTimeout(bindDetalle,0);
+      saveLocal();
+      render();
+      setTimeout(bindDetalle,0);
     }
   };
   reader.readAsDataURL(file);
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-// Cargar Tesseract.js para OCR
 const t=document.createElement("script");
 t.src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
 document.head.appendChild(t);
 
-if(window._firebaseReady)initStorage();
-else{window.addEventListener("firebaseReady",initStorage);setTimeout(initStorage,3000);}
+if(window._firebaseReady){
+  initStorage();
+} else {
+  window.addEventListener("firebaseReady",initStorage);
+  setTimeout(initStorage,3000);
+}
 </script>
 </body>
 </html>
