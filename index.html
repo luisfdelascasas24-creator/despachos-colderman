@@ -320,7 +320,32 @@ function renderLista(){
         ${AGENCIAS.filter(a=>a!=="Otra...").map(a=>`<option value="${a}" ${state.filtroAgencia===a?"selected":""}>${a}</option>`).join("")}
       </select>
     </div>
-    <div class="page">${cards}</div>`;
+    <div style="display:flex;gap:12px;align-items:flex-start;max-width:960px;margin:0 auto;padding:12px 16px 0">
+      <div style="flex:1;min-width:0">
+        ${cards}
+      </div>
+      <div style="width:160px;flex-shrink:0;display:flex;flex-direction:column;gap:8px">
+        <div style="font-size:11px;color:#555;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px">Resumen hoy</div>
+        ${(()=>{
+          const hoyStr=new Date().toLocaleDateString("es-CL");
+          const pendHoy=state.despachos.filter(d=>d.estado==="pendiente");
+          // contar por agencia
+          const conteo={};
+          pendHoy.forEach(d=>{
+            const key=d.destino==="bodega"?"🏭 Bodega":d.destino==="oficina"?"🏢 Oficina":(d.agencia==="Otra..."?(d.agenciaCustom||"Otra"):d.agencia)||"Sin agencia";
+            conteo[key]=(conteo[key]||0)+1;
+          });
+          if(Object.keys(conteo).length===0) return`<div style="font-size:12px;color:#555;text-align:center;padding:10px 0">Sin pendientes</div>`;
+          return Object.entries(conteo).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`
+            <div class="resumen-item" data-agencia="${k}"
+              style="background:${state.filtroAgencia===k?"#2a1f00":"#1a1a1a"};border:1px solid ${state.filtroAgencia===k?"#e07b00":"#2a2a2a"};border-radius:10px;padding:8px 10px;cursor:pointer;display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:12px;color:#ccc;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${k}</span>
+              <span style="font-size:14px;font-weight:700;color:#e07b00;margin-left:6px">${v}</span>
+            </div>`).join("");
+        })()}
+        ${state.filtroAgencia?`<button id="btnLimpiarResumen" style="background:none;border:1px solid #333;border-radius:8px;padding:6px;color:#666;font-size:11px;cursor:pointer">✕ Limpiar filtro</button>`:""}
+      </div>
+    </div>
 }
 function bindLista(){
   document.getElementById("btnNuevo").onclick=()=>setState({view:"nuevo",form:emptyForm()});
@@ -330,8 +355,16 @@ function bindLista(){
   document.getElementById("btnHoy").onclick=()=>setState({filtroDia:state.filtroDia==="hoy"?"todos":"hoy",filtroFecha:""});
   document.getElementById("filtroCalendario").onchange=e=>setState({filtroFecha:e.target.value,filtroDia:"todos"});
   document.getElementById("filtroAgencia").onchange=e=>setState({filtroAgencia:e.target.value});
-  const btnLimpiar=document.getElementById("btnLimpiarFecha");
-  if(btnLimpiar) btnLimpiar.onclick=()=>setState({filtroFecha:""});
+  document.querySelectorAll(".resumen-item").forEach(el=>{
+    el.onclick=()=>{
+      const ag=el.dataset.agencia;
+      if(ag==="🏭 Bodega") setState({filtroAgencia:"",filtro:"todos"});
+      else if(ag==="🏢 Oficina") setState({filtroAgencia:"",filtro:"todos"});
+      else setState({filtroAgencia:state.filtroAgencia===ag?"":ag});
+    };
+  });
+  const btnLR=document.getElementById("btnLimpiarResumen");
+  if(btnLR) btnLR.onclick=()=>setState({filtroAgencia:""});
 }
 
 // ── NUEVO ─────────────────────────────────────────────────────────────────────
@@ -421,12 +454,13 @@ function bindNuevo(){
   document.getElementById("uploadArea").onclick=()=>document.getElementById("fileInput").click();
   document.getElementById("fileInput").onchange=e=>handleFile(e.target.files[0]);
 
-  // Pegar con Ctrl+V en formulario nuevo
+  // Pegar con Ctrl+V
   const onPasteNuevo=e=>{
     const items=e.clipboardData?.items;
     if(!items)return;
     for(const item of items){
       if(item.type.startsWith("image/")){
+        e.preventDefault();
         handleFile(item.getAsFile());
         break;
       }
@@ -434,6 +468,11 @@ function bindNuevo(){
   };
   document.addEventListener("paste",onPasteNuevo);
   window._pasteNuevoCleanup=()=>document.removeEventListener("paste",onPasteNuevo);
+
+  // También activar paste al hacer click en el área
+  document.getElementById("uploadArea").addEventListener("keydown",e=>{
+    if((e.ctrlKey||e.metaKey)&&e.key==="v") document.getElementById("uploadArea").focus();
+  });
   document.getElementById("fNombre").oninput=e=>{state.form.nombre=e.target.value;};
   document.getElementById("fRut").oninput=e=>{state.form.rut=e.target.value;};
   document.getElementById("fNDoc").oninput=e=>{state.form.nDoc=e.target.value;};
