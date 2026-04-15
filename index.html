@@ -228,7 +228,10 @@ let state={
   filtroExtra:"",
   form:emptyForm(),
   useFirebase:false,
-  canInstall:false
+  canInstall:false,
+  ticketStatusId:null,
+  ticketStatusMessage:"",
+  ticketStatusType:"info"
 };
 
 function showToast(msg){
@@ -859,6 +862,15 @@ function renderDetalle(){
       ${d.docImg?`<div class="gallery"><div class="thumb" data-doc-open="1"><img src="${d.docImg}" alt="Documento" /><div class="thumb-label">Documento</div></div></div>`:`<div style="color:#555;font-size:13px;margin-bottom:16px">Sin documento adjunto.</div>`}
       <div style="font-size:13px;color:#aaa;font-weight:700;margin:16px 0 10px">CAMBIAR ESTADO</div>
       ${Object.entries(ESTADOS).map(([k,v])=>`<button class="btn-estado" data-estado="${k}" data-fbkey="${d.fbKey||""}" style="color:${v.color};border-color:${d.estado===k?v.color:"#333"};background:${d.estado===k?v.bg:"#1a1a1a"}">${d.estado===k?"✓ ":""}${v.label}</button>`).join("")}
+      <div style="font-size:13px;color:#aaa;font-weight:700;margin:18px 0 10px">TRACKING</div>
+      <div class="field" style="margin-bottom:12px">
+        <label>Número de seguimiento</label>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input id="detalleTrackingInput" value="${d.tracking||""}" placeholder="Escribe o corrige el tracking" style="flex:1;min-width:220px" />
+          <button id="btnGuardarTracking" class="btn-secondary" style="white-space:nowrap">Guardar</button>
+        </div>
+      </div>
+      ${state.ticketStatusId===d.id && state.ticketStatusMessage?`<div class="banner ${state.ticketStatusType==="warn"?"warn":"info"}" style="margin:0 0 12px 0;max-width:none">${state.ticketStatusMessage}</div>`:""}
       <div style="font-size:13px;color:#aaa;font-weight:700;margin:18px 0 10px">TICKETS DE ENTREGA</div>
       ${ticketImgs.length?`<div class="gallery" style="margin-bottom:10px">${ticketImgs.map((img,idx)=>`<div class="thumb" data-ticket-open="${idx}"><img src="${img}" alt="Ticket ${idx+1}" /><div class="thumb-label">Ticket ${idx+1}</div></div>`).join("")}</div><div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap"><button id="btnWhatsapp" class="btn-primary" style="background:#25D366">📲 WhatsApp</button><button id="btnDescargarTodo" class="btn-secondary">⬇️ Descargar ticket principal</button></div>`:`<div style="color:#555;font-size:13px;margin-bottom:10px">No hay foto del ticket aún.</div>`}
       <div class="upload-area" id="ticketUpload" style="margin-bottom:8px"><div style="font-size:24px">📷</div><div style="color:#ddd;font-size:13px;margin-top:4px;font-weight:700">${ticketImgs.length?"Agregar / cambiar ticket(s)":"Subir ticket(s)"}</div><div style="color:#777;font-size:12px;margin-top:6px">Puedes subir varias fotos. En FedEx, sube las 2.</div></div>
@@ -875,6 +887,20 @@ function bindDetalle(){
   document.getElementById("btnDelete").onclick=()=>{ if(confirm("¿Eliminar este despacho?")) dbEliminar(state.selectedId,d?.fbKey); };
   document.getElementById("btnEditar").onclick=()=>{ setState({view:"nuevo",form:{...emptyForm(),...d,imgPreview:d.docImg||null,ticketImgs:[...ticketImgs],ticketImg:ticketImgs[0]||""}}); };
   const btnText=document.getElementById("btnShareOnlyText"); if(btnText){ btnText.onclick=()=>window.open("https://api.whatsapp.com/send?text="+encodeURIComponent(buildWhatsappMessage(d)),"_blank"); }
+  const btnGuardarTracking=document.getElementById("btnGuardarTracking");
+  if(btnGuardarTracking){
+    btnGuardarTracking.onclick=()=>{
+      const input=document.getElementById("detalleTrackingInput");
+      const valor=String(input.value||"").trim();
+      const nuevo={...d,tracking:valor,historial:addHistory(d,"Tracking editado",valor||"Tracking eliminado")};
+      dbActualizar(nuevo);
+      state.ticketStatusId=d.id;
+      state.ticketStatusType="info";
+      state.ticketStatusMessage=valor?`Tracking guardado: ${valor}`:"Tracking eliminado";
+      render();
+      setTimeout(bindDetalle,0);
+    };
+  }
   document.querySelectorAll("[data-doc-open]").forEach(el=>{ el.onclick=()=>openImageOverlay(d.docImg); });
   document.querySelectorAll("[data-ticket-open]").forEach(el=>{ const idx=+el.dataset.ticketOpen; el.onclick=()=>openImageOverlay(ticketImgs[idx]); });
   document.querySelectorAll(".btn-estado").forEach(btn=>{ btn.onclick=()=>{ const nuevoEstado=btn.dataset.estado; if(nuevoEstado==="entregado" && !ticketImgs.length){ const seguir=confirm("Este despacho se marcará como entregado sin ticket. ¿Continuar?"); if(!seguir) return; } dbEstado(state.selectedId,btn.dataset.fbkey,nuevoEstado); }; });
@@ -889,7 +915,13 @@ function bindDetalle(){
 async function guardarTickets(files){
   if(!files || !files.length) return;
   const d=state.despachos.find(x=>x.id===state.selectedId); if(!d) return;
-  showToast("Subiendo ticket...");
+
+  state.ticketStatusId=d.id;
+  state.ticketStatusType="info";
+  state.ticketStatusMessage="Subiendo ticket...";
+  render();
+  setTimeout(bindDetalle,0);
+
   let ticketImgsActuales=Array.isArray(d.ticketImgs)?[...d.ticketImgs]:(d.ticketImg?[d.ticketImg]:[]);
   const nuevasImgs=[];
   for(const file of files){
@@ -897,20 +929,64 @@ async function guardarTickets(files){
     const imgData=await new Promise((resolve,reject)=>{ const reader=new FileReader(); reader.onload=ev=>resolve(ev.target.result); reader.onerror=reject; reader.readAsDataURL(file); });
     nuevasImgs.push(imgData);
   }
+
   if(String(d.agencia||"").toLowerCase().includes("fedex")) ticketImgsActuales=[...ticketImgsActuales,...nuevasImgs].slice(0,2);
   else ticketImgsActuales=[...ticketImgsActuales,...nuevasImgs];
+
   let nuevo={...d,ticketImgs:ticketImgsActuales,ticketImg:ticketImgsActuales[0]||"",historial:addHistory(d,"Ticket guardado",`Se guardó ${nuevasImgs.length} ticket${nuevasImgs.length>1?"s":""}`)};
   dbActualizar(nuevo);
-  showToast("Ticket guardado correctamente");
+
+  state.ticketStatusId=d.id;
+  state.ticketStatusType="info";
+  state.ticketStatusMessage="Ticket guardado correctamente";
+  render();
+  setTimeout(bindDetalle,0);
+
   setTimeout(async()=>{
-    showToast("Leyendo número de seguimiento...");
-    let trackingDetectado=nuevo.tracking||"";
+    state.ticketStatusId=d.id;
+    state.ticketStatusType="info";
+    state.ticketStatusMessage="Leyendo número de seguimiento...";
+    render();
+    setTimeout(bindDetalle,0);
+
+    let trackingDetectado=String(nuevo.tracking||"").trim();
     for(const file of files){
-      try{ const text=await ocrImage(file,"spa"); const tracking=detectTrackingByAgency(text, d.agencia==="Otra..."?d.agenciaCustom:d.agencia); if(tracking && !trackingDetectado) trackingDetectado=tracking; if(String(d.agencia||"").toLowerCase().includes("fedex") && tracking) trackingDetectado=tracking; }catch(err){ console.log("No se pudo leer tracking de uno de los tickets",err); }
+      try{
+        const text=await ocrImage(file,"spa");
+        const tracking=detectTrackingByAgency(text, d.agencia==="Otra..."?d.agenciaCustom:d.agencia);
+        if(tracking && !trackingDetectado) trackingDetectado=tracking;
+        if(String(d.agencia||"").toLowerCase().includes("fedex") && tracking) trackingDetectado=tracking;
+      }catch(err){
+        console.log("No se pudo leer tracking de uno de los tickets",err);
+      }
     }
-    if(trackingDetectado && trackingDetectado!==nuevo.tracking){ nuevo={...nuevo,tracking:trackingDetectado,historial:addHistory(nuevo,"Tracking detectado",trackingDetectado)}; dbActualizar(nuevo); showToast(`Tracking detectado: ${trackingDetectado}`); }
-    else showToast("Ticket listo para enviar");
-  },80);
+
+    if(trackingDetectado && trackingDetectado!==String(nuevo.tracking||"").trim()){
+      nuevo={...nuevo,tracking:trackingDetectado,historial:addHistory(nuevo,"Tracking detectado",trackingDetectado)};
+      dbActualizar(nuevo);
+      state.ticketStatusId=d.id;
+      state.ticketStatusType="info";
+      state.ticketStatusMessage=`Tracking detectado: ${trackingDetectado}`;
+      render();
+      setTimeout(bindDetalle,0);
+      return;
+    }
+
+    if(!trackingDetectado){
+      state.ticketStatusId=d.id;
+      state.ticketStatusType="warn";
+      state.ticketStatusMessage="No se pudo detectar automáticamente. Puedes escribir el tracking manualmente.";
+      render();
+      setTimeout(bindDetalle,0);
+      return;
+    }
+
+    state.ticketStatusId=d.id;
+    state.ticketStatusType="info";
+    state.ticketStatusMessage=`Tracking listo: ${trackingDetectado}`;
+    render();
+    setTimeout(bindDetalle,0);
+  },120);
 }
 
 function registerServiceWorker(){
