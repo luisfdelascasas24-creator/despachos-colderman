@@ -12,6 +12,7 @@
 
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
   <script>
     const firebaseConfig = {
       apiKey: "AIzaSyAaXhbTngCzxcXdo3i-mfwy_kG2ehNS4sc",
@@ -24,6 +25,7 @@
     };
     firebase.initializeApp(firebaseConfig);
     window._db = firebase.database();
+    window._storage = firebase.storage();
     window._firebaseReady = true;
     window.dispatchEvent(new Event("firebaseReady"));
   </script>
@@ -583,7 +585,53 @@ function setState(p){ if(window._pasteCleanup){window._pasteCleanup();window._pa
 function badge(e){ const v=ESTADOS[e]||ESTADOS.pendiente; return `<span class="badge" style="color:${v.color};border-color:${v.color};background:${v.bg}">${v.label}</span>`; }
 function counts(){ return { pendiente:state.despachos.filter(d=>d.estado==="pendiente").length, entregado:state.despachos.filter(d=>d.estado==="entregado").length, falta_doc:state.despachos.filter(d=>d.estado==="falta_doc").length }; }
 
+// Comprime/redimensiona una imagen antes de subirla, para no llenar Storage/DB de fotos pesadas
+function resizeImage(file,maxDim=1600,quality=0.75){
+  return new Promise((resolve,reject)=>{
+    const img=new Image();
+    const url=URL.createObjectURL(file);
+    img.onload=()=>{
+      let {width,height}=img;
+      if(width>maxDim||height>maxDim){
+        if(width>height){ height=Math.round(height*(maxDim/width)); width=maxDim; }
+        else { width=Math.round(width*(maxDim/height)); height=maxDim; }
+      }
+      const canvas=document.createElement("canvas");
+      canvas.width=width; canvas.height=height;
+      canvas.getContext("2d").drawImage(img,0,0,width,height);
+      canvas.toBlob(blob=>{ URL.revokeObjectURL(url); blob?resolve(blob):reject(new Error("No se pudo comprimir la imagen")); },"image/jpeg",quality);
+    };
+    img.onerror=e=>{ URL.revokeObjectURL(url); reject(e); };
+    img.src=url;
+  });
+}
+
+// Sube una imagen (ya comprimida) a Firebase Storage y devuelve la URL pública de descarga
+async function uploadImageToStorage(blob,pathPrefix){
+  if(!window._storage) throw new Error("Firebase Storage no está listo");
+  const path=`${pathPrefix}/${Date.now()}_${Math.random().toString(36).slice(2,8)}.jpg`;
+  const ref=window._storage.ref().child(path);
+  await ref.put(blob,{contentType:"image/jpeg"});
+  return await ref.getDownloadURL();
+}
+
+// Carga Tesseract.js solo la primera vez que realmente se necesita (no al abrir la app)
+let _tesseractLoadPromise=null;
+function loadTesseract(){
+  if(window.Tesseract) return Promise.resolve();
+  if(_tesseractLoadPromise) return _tesseractLoadPromise;
+  _tesseractLoadPromise=new Promise((resolve,reject)=>{
+    const t=document.createElement("script");
+    t.src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
+    t.onload=()=>resolve();
+    t.onerror=()=>reject(new Error("No se pudo cargar el lector OCR"));
+    document.head.appendChild(t);
+  });
+  return _tesseractLoadPromise;
+}
+
 async function ocrImage(file,lang="spa"){
+  await loadTesseract();
   const {createWorker}=Tesseract;
   const worker=await createWorker(lang);
   const {data:{text}}=await worker.recognize(file);
@@ -615,15 +663,32 @@ async function handleFile(file){
   reader.readAsDataURL(file);
 }
 
-function guardar(){
+async function guardar(){
   const f=state.form;
   if(!f.nombre.trim()){ showToast("Falta el nombre del cliente"); return; }
   if(f.destino==="provincia" && !f.agencia){ showToast("Selecciona una agencia para provincia"); return; }
   const dup=findPossibleDuplicate(f);
   if(dup){ const seguir=confirm(`Parece duplicado:\n${dup.nombre}${dup.nDoc?" · N° "+dup.nDoc:""}\n\n¿Guardar igual?`); if(!seguir) return; }
+
+  let docImgUrl=f.imgPreview||"";
+  // Si es una imagen recién capturada (base64), subirla a Storage y guardar solo la URL
+  if(docImgUrl.startsWith("data:")){
+    const btn=document.getElementById("btnGuardar"); if(btn){ btn.disabled=true; btn.textContent="Subiendo imagen..."; }
+    try{
+      const resp=await fetch(docImgUrl);
+      const rawBlob=await resp.blob();
+      const compressed=await resizeImage(rawBlob,1600,0.75);
+      docImgUrl=await uploadImageToStorage(compressed,"docs");
+    }catch(err){
+      console.error("Error subiendo docImg",err);
+      showToast("No se pudo subir la imagen del documento, se guardará sin foto");
+      docImgUrl="";
+    }
+  }
+
   const existe=state.despachos.find(d=>d.id===f.id);
   const base={
-    id:existe?f.id:Date.now(), fbKey:existe?(f.fbKey||existe.fbKey||""):(f.fbKey||""), ts:Date.now(), nombre:sanitizeName(f.nombre.trim()), rut:f.rut.trim(), nDoc:(f.nDoc||"").trim(), bultos:f.bultos||"", tracking:(f.tracking||"").trim(), docImg:f.imgPreview||"", tipoCompra:f.tipoCompra, empresaNacional:f.empresaNacional, empresaNacionalCustom:(f.empresaNacionalCustom||"").trim(), destino:f.destino, agencia:f.agencia, agenciaCustom:(f.agenciaCustom||"").trim(), direccionDestino:(f.direccionDestino||"").trim(), region:f.region||"", notas:(f.notas||"").trim(), ticketImgs:Array.isArray(f.ticketImgs)?f.ticketImgs:(f.ticketImg?[f.ticketImg]:[]), ticketImg:(Array.isArray(f.ticketImgs)?f.ticketImgs[0]:f.ticketImg)||"", estado:existe?(f.estado||existe.estado||"pendiente"):"pendiente", fecha:existe?(f.fecha||existe.fecha):new Date().toLocaleDateString("es-CL"), historial:existe?addHistory(existe,"Despacho editado","Se actualizaron datos del despacho"):addHistory({historial:[]},"Despacho creado","Creación inicial")
+    id:existe?f.id:Date.now(), fbKey:existe?(f.fbKey||existe.fbKey||""):(f.fbKey||""), ts:Date.now(), nombre:sanitizeName(f.nombre.trim()), rut:f.rut.trim(), nDoc:(f.nDoc||"").trim(), bultos:f.bultos||"", tracking:(f.tracking||"").trim(), docImg:docImgUrl, tipoCompra:f.tipoCompra, empresaNacional:f.empresaNacional, empresaNacionalCustom:(f.empresaNacionalCustom||"").trim(), destino:f.destino, agencia:f.agencia, agenciaCustom:(f.agenciaCustom||"").trim(), direccionDestino:(f.direccionDestino||"").trim(), region:f.region||"", notas:(f.notas||"").trim(), ticketImgs:Array.isArray(f.ticketImgs)?f.ticketImgs:(f.ticketImg?[f.ticketImg]:[]), ticketImg:(Array.isArray(f.ticketImgs)?f.ticketImgs[0]:f.ticketImg)||"", estado:existe?(f.estado||existe.estado||"pendiente"):"pendiente", fecha:existe?(f.fecha||existe.fecha):new Date().toLocaleDateString("es-CL"), historial:existe?addHistory(existe,"Despacho editado","Se actualizaron datos del despacho"):addHistory({historial:[]},"Despacho creado","Creación inicial")
   };
   if(existe){ dbActualizar(base); showToast("Despacho editado"); } else { dbGuardar(base); showToast("Despacho guardado"); }
   setState({view:"lista",form:emptyForm()});
@@ -926,8 +991,14 @@ async function guardarTickets(files){
   const nuevasImgs=[];
   for(const file of files){
     if(!file.type.startsWith("image/")) continue;
-    const imgData=await new Promise((resolve,reject)=>{ const reader=new FileReader(); reader.onload=ev=>resolve(ev.target.result); reader.onerror=reject; reader.readAsDataURL(file); });
-    nuevasImgs.push(imgData);
+    try{
+      const compressed=await resizeImage(file,1600,0.75);
+      const url=await uploadImageToStorage(compressed,"tickets");
+      nuevasImgs.push(url);
+    }catch(err){
+      console.error("Error subiendo ticket",err);
+      state.ticketStatusId=d.id; state.ticketStatusType="error"; state.ticketStatusMessage="No se pudo subir una de las fotos"; render(); setTimeout(bindDetalle,0);
+    }
   }
 
   if(String(d.agencia||"").toLowerCase().includes("fedex")) ticketImgsActuales=[...ticketImgsActuales,...nuevasImgs].slice(0,2);
@@ -1037,7 +1108,6 @@ function registerServiceWorker(){
 setupDynamicManifest();
 setupInstallPrompt();
 registerServiceWorker();
-const t=document.createElement("script"); t.src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"; document.head.appendChild(t);
 if(window._firebaseReady) initStorage(); else { window.addEventListener("firebaseReady",initStorage); setTimeout(initStorage,3000); }
 </script>
 </body>
