@@ -12,7 +12,6 @@
 
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
   <script>
     const firebaseConfig = {
       apiKey: "AIzaSyAaXhbTngCzxcXdo3i-mfwy_kG2ehNS4sc",
@@ -25,7 +24,6 @@
     };
     firebase.initializeApp(firebaseConfig);
     window._db = firebase.database();
-    window._storage = firebase.storage();
     window._firebaseReady = true;
     window.dispatchEvent(new Event("firebaseReady"));
   </script>
@@ -444,7 +442,7 @@ function exportCSV(){
     `"${String(getAgencyLabel(d)||"").replace(/"/g,'""')}"`,
     `"${String(d.direccionDestino||"").replace(/"/g,'""')}"`,
     `"${String(d.notas||"").replace(/"/g,'""')}"`,
-    `"${Array.isArray(d.ticketImgs)?d.ticketImgs.length:(d.ticketImg?1:0)}"`
+    `"${ticketCountFor(d)}"`
   ].join(","));
   const csv="\uFEFF"+head.join(",")+"\n"+rows.join("\n");
   const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});
@@ -465,12 +463,14 @@ function findPossibleDuplicate(form){
   });
 }
 
+function ticketCountFor(d){ return typeof d.ticketCount==="number"?d.ticketCount:(Array.isArray(d.ticketImgs)?d.ticketImgs.length:(d.ticketImg?1:0)); }
+function hasDocFor(d){ return typeof d.hasDoc==="boolean"?d.hasDoc:!!d.docImg; }
 function dashboardData(){
   const hoy=new Date().toLocaleDateString("es-CL");
   return {
     total:state.despachos.length,
     hoy:state.despachos.filter(d=>d.fecha===hoy).length,
-    sinTicket:state.despachos.filter(d=>d.estado==="entregado" && !(Array.isArray(d.ticketImgs)?d.ticketImgs.length:d.ticketImg?1:0)).length,
+    sinTicket:state.despachos.filter(d=>d.estado==="entregado" && !ticketCountFor(d)).length,
     atrasados:state.despachos.filter(d=>d.estado==="pendiente" && d.fecha!==hoy).length
   };
 }
@@ -567,19 +567,42 @@ function initStorage(){
 }
 function saveLocal(){ localStorage.setItem("dcold",JSON.stringify(state.despachos)); }
 function dbGuardar(d){
-  const payload={...d,ticketImgs:Array.isArray(d.ticketImgs)?d.ticketImgs:(d.ticketImg?[d.ticketImg]:[])};
-  payload.ticketImg=payload.ticketImgs[0]||"";
-  if(state.useFirebase){ const out={...payload}; delete out.fbKey; window._db.ref("despachos").push(out); }
-  else{ state.despachos=[payload,...state.despachos]; saveLocal(); render(); }
+  const ticketImgs=Array.isArray(d.ticketImgs)?d.ticketImgs:(d.ticketImg?[d.ticketImg]:[]);
+  const docImg=d.docImg||"";
+  const payload={...d,ticketCount:ticketImgs.length,hasDoc:!!docImg};
+  delete payload.docImg; delete payload.ticketImgs; delete payload.ticketImg;
+  if(state.useFirebase){
+    const out={...payload}; delete out.fbKey;
+    const ref=window._db.ref("despachos").push(out);
+    const key=ref.key;
+    if(docImg||ticketImgs.length){ window._db.ref("despachosImgs/"+key).set({docImg,ticketImgs}); }
+    state.imgCache=state.imgCache||{}; state.imgCache[key]={docImg,ticketImgs};
+  } else {
+    state.despachos=[{...payload,docImg,ticketImgs,ticketImg:ticketImgs[0]||""},...state.despachos]; saveLocal(); render();
+  }
 }
 function dbActualizar(d){
-  const payload={...d,ticketImgs:Array.isArray(d.ticketImgs)?d.ticketImgs:(d.ticketImg?[d.ticketImg]:[])};
-  payload.ticketImg=payload.ticketImgs[0]||"";
-  if(state.useFirebase && d.fbKey){ const out={...payload}; delete out.fbKey; window._db.ref("despachos/"+d.fbKey).set(out); }
-  else{ state.despachos=state.despachos.map(x=>x.id===d.id?payload:x); saveLocal(); render(); }
+  const existe=state.despachos.find(x=>x.id===d.id)||{};
+  const tieneCambioImg=("docImg" in d)||("ticketImgs" in d)||("ticketImg" in d);
+  let ticketCount=existe.ticketCount, hasDoc=existe.hasDoc, docImg, ticketImgs;
+  if(tieneCambioImg){
+    ticketImgs=Array.isArray(d.ticketImgs)?d.ticketImgs:(d.ticketImg?[d.ticketImg]:[]);
+    docImg=d.docImg||"";
+    ticketCount=ticketImgs.length; hasDoc=!!docImg;
+  }
+  const payload={...d,ticketCount,hasDoc};
+  delete payload.docImg; delete payload.ticketImgs; delete payload.ticketImg;
+  if(state.useFirebase && d.fbKey){
+    const out={...payload}; delete out.fbKey;
+    window._db.ref("despachos/"+d.fbKey).set(out);
+    if(tieneCambioImg){ window._db.ref("despachosImgs/"+d.fbKey).set({docImg,ticketImgs}); state.imgCache=state.imgCache||{}; state.imgCache[d.fbKey]={docImg,ticketImgs}; }
+  } else {
+    const completo=tieneCambioImg?{...payload,docImg,ticketImgs,ticketImg:ticketImgs[0]||""}:{...payload,docImg:existe.docImg,ticketImgs:existe.ticketImgs,ticketImg:existe.ticketImg};
+    state.despachos=state.despachos.map(x=>x.id===d.id?completo:x); saveLocal(); render();
+  }
 }
 function dbEstado(id,fbKey,estado){ const d=state.despachos.find(x=>x.id===id); if(!d) return; dbActualizar({...d,estado,historial:addHistory(d,"Estado cambiado",estado)}); showToast("Estado actualizado"); }
-function dbEliminar(id,fbKey){ if(state.useFirebase && fbKey){ window._db.ref("despachos/"+fbKey).remove(); } else { state.despachos=state.despachos.filter(d=>d.id!==id); saveLocal(); } setState({view:"lista",selectedId:null}); showToast("Despacho eliminado"); }
+function dbEliminar(id,fbKey){ if(state.useFirebase && fbKey){ window._db.ref("despachos/"+fbKey).remove(); window._db.ref("despachosImgs/"+fbKey).remove(); } else { state.despachos=state.despachos.filter(d=>d.id!==id); saveLocal(); } setState({view:"lista",selectedId:null}); showToast("Despacho eliminado"); }
 
 function setState(p){ if(window._pasteCleanup){window._pasteCleanup();window._pasteCleanup=null;} if(window._pasteNuevoCleanup){window._pasteNuevoCleanup();window._pasteNuevoCleanup=null;} Object.assign(state,p); render(); }
 function badge(e){ const v=ESTADOS[e]||ESTADOS.pendiente; return `<span class="badge" style="color:${v.color};border-color:${v.color};background:${v.bg}">${v.label}</span>`; }
@@ -606,13 +629,52 @@ function resizeImage(file,maxDim=1600,quality=0.75){
   });
 }
 
-// Sube una imagen (ya comprimida) a Firebase Storage y devuelve la URL pública de descarga
-async function uploadImageToStorage(blob,pathPrefix){
-  if(!window._storage) throw new Error("Firebase Storage no está listo");
-  const path=`${pathPrefix}/${Date.now()}_${Math.random().toString(36).slice(2,8)}.jpg`;
-  const ref=window._storage.ref().child(path);
-  await ref.put(blob,{contentType:"image/jpeg"});
-  return await ref.getDownloadURL();
+// Convierte un blob (ya comprimido) a base64 para guardarlo en Realtime Database
+function blobToDataURL(blob){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>resolve(reader.result);
+    reader.onerror=reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+// Trae las fotos (docImg/ticketImgs) de un despacho desde el nodo separado "despachosImgs",
+// usando caché en memoria para no volver a pedirlas si ya las tenemos.
+async function fetchImgsNow(fbKey){
+  if(!fbKey) return {docImg:"",ticketImgs:[]};
+  state.imgCache=state.imgCache||{};
+  if(state.imgCache[fbKey]) return state.imgCache[fbKey];
+  if(!window._db) return {docImg:"",ticketImgs:[]};
+  const snap=await window._db.ref("despachosImgs/"+fbKey).once("value");
+  const v=snap.val()||{};
+  const result={docImg:v.docImg||"",ticketImgs:Array.isArray(v.ticketImgs)?v.ticketImgs:(v.ticketImg?[v.ticketImg]:[])};
+  state.imgCache[fbKey]=result;
+  return result;
+}
+
+// Dispara la carga de fotos en segundo plano si el despacho tiene foto pero no la hemos traído aún,
+// y vuelve a renderizar cuando lleguen (sin bloquear la vista mientras tanto).
+function ensureImgsLoaded(d){
+  if(!state.useFirebase || !d.fbKey) return;
+  if(state.imgCache && state.imgCache[d.fbKey]) return;
+  if(d.docImg || (Array.isArray(d.ticketImgs)&&d.ticketImgs.length) || d.ticketImg) return; // registro viejo, ya viene con las fotos incluidas
+  const esperaFotos=d.hasDoc || (typeof d.ticketCount==="number" && d.ticketCount>0);
+  if(!esperaFotos) return;
+  state._imgFetching=state._imgFetching||{};
+  if(state._imgFetching[d.fbKey]) return;
+  state._imgFetching[d.fbKey]=true;
+  fetchImgsNow(d.fbKey).finally(()=>{
+    delete state._imgFetching[d.fbKey];
+    if(state.view==="detalle" && state.selectedId===d.id) render();
+  });
+}
+
+// Devuelve {docImg,ticketImgs} para mostrar, priorizando la caché ya cargada
+function getImgsFor(d){
+  const cached=state.imgCache && state.imgCache[d.fbKey];
+  if(cached) return cached;
+  return {docImg:d.docImg||"",ticketImgs:Array.isArray(d.ticketImgs)?d.ticketImgs:(d.ticketImg?[d.ticketImg]:[])};
 }
 
 // Carga Tesseract.js solo la primera vez que realmente se necesita (no al abrir la app)
@@ -671,18 +733,17 @@ async function guardar(){
   if(dup){ const seguir=confirm(`Parece duplicado:\n${dup.nombre}${dup.nDoc?" · N° "+dup.nDoc:""}\n\n¿Guardar igual?`); if(!seguir) return; }
 
   let docImgUrl=f.imgPreview||"";
-  // Si es una imagen recién capturada (base64), subirla a Storage y guardar solo la URL
+  // Comprimir la imagen antes de guardarla (sigue siendo base64, pero mucho más liviana)
   if(docImgUrl.startsWith("data:")){
-    const btn=document.getElementById("btnGuardar"); if(btn){ btn.disabled=true; btn.textContent="Subiendo imagen..."; }
+    const btn=document.getElementById("btnGuardar"); if(btn){ btn.disabled=true; btn.textContent="Optimizando imagen..."; }
     try{
       const resp=await fetch(docImgUrl);
       const rawBlob=await resp.blob();
       const compressed=await resizeImage(rawBlob,1600,0.75);
-      docImgUrl=await uploadImageToStorage(compressed,"docs");
+      docImgUrl=await blobToDataURL(compressed);
     }catch(err){
-      console.error("Error subiendo docImg",err);
-      showToast("No se pudo subir la imagen del documento, se guardará sin foto");
-      docImgUrl="";
+      console.error("Error comprimiendo docImg",err);
+      // si falla la compresión, se guarda igual la imagen original sin comprimir
     }
   }
 
@@ -704,14 +765,14 @@ function render(){
 function renderLista(){
   const c=counts(), dash=dashboardData(), hoy=new Date().toLocaleDateString("es-CL");
   const pendientesAtrasados=state.despachos.filter(d=>d.estado==="pendiente" && d.fecha!==hoy);
-  const sinTicket=state.despachos.filter(d=>d.estado==="entregado" && !(Array.isArray(d.ticketImgs)?d.ticketImgs.length:d.ticketImg?1:0));
+  const sinTicket=state.despachos.filter(d=>d.estado==="entregado" && !ticketCountFor(d));
   const filtrados=(()=>{
     let arr=state.filtro==="todos"?[...state.despachos]:state.despachos.filter(d=>d.estado===state.filtro);
     if(state.filtroDia==="hoy") arr=arr.filter(d=>d.fecha===hoy);
     if(state.filtroFecha){ const fechaSel=new Date(state.filtroFecha+"T00:00:00").toLocaleDateString("es-CL"); arr=arr.filter(d=>d.fecha===fechaSel); }
     if(state.filtroAgencia) arr=arr.filter(d=>getAgencyLabel(d)===state.filtroAgencia);
     if(state.filtroExtra==="atrasados") arr=arr.filter(d=>d.estado==="pendiente" && d.fecha!==hoy);
-    if(state.filtroExtra==="sin_ticket") arr=arr.filter(d=>d.estado==="entregado" && !(Array.isArray(d.ticketImgs)?d.ticketImgs.length:d.ticketImg?1:0));
+    if(state.filtroExtra==="sin_ticket") arr=arr.filter(d=>d.estado==="entregado" && !ticketCountFor(d));
     if(state.filtroExtra==="nacional") arr=arr.filter(d=>d.tipoCompra==="nacional");
     if(state.filtroExtra==="importacion") arr=arr.filter(d=>d.tipoCompra==="importacion");
     if(state.busqueda.trim()){
@@ -725,7 +786,7 @@ function renderLista(){
 
   const cards=filtrados.length===0 ? `<div class="empty">${state.despachos.length===0?"No hay despachos. Agrega el primero.":"Sin resultados."}</div>` : filtrados.map(d=>{
     const agenciaLabel=getAgencyLabel(d), empresaLabel=getEmpresaLabel(d), destinoLabel=d.destino==="provincia"?"Provincia":d.destino==="oficina"?"Oficina":"Bodega";
-    const atrasado=d.estado==="pendiente" && d.fecha!==hoy; const ticketCount=Array.isArray(d.ticketImgs)?d.ticketImgs.length:(d.ticketImg?1:0);
+    const atrasado=d.estado==="pendiente" && d.fecha!==hoy; const ticketCount=ticketCountFor(d);
     return `
       <div class="card list-card soft-fade" data-id="${d.id}" style="border-color:${atrasado?"rgba(239,68,68,.25)":"rgba(255,255,255,.07)"}">
         <div class="list-card-top">
@@ -916,15 +977,19 @@ function bindNuevo(){
 
 function renderDetalle(){
   const d=state.despachos.find(x=>x.id===state.selectedId); if(!d) return renderLista();
+  ensureImgsLoaded(d);
   const empresaLabel=getEmpresaLabel(d), agenciaLabel=getAgencyLabel(d), destinoLabel=d.destino==="provincia"?"📦 Envío a provincia":d.destino==="oficina"?"🏢 Recepción en oficina":"🏭 Recojo en bodega";
-  const ticketImgs=Array.isArray(d.ticketImgs)?d.ticketImgs:(d.ticketImg?[d.ticketImg]:[]);
+  const imgs=getImgsFor(d);
+  const cargandoImgs=!state.imgCache?.[d.fbKey] && (d.hasDoc||d.ticketCount>0) && !imgs.docImg && !imgs.ticketImgs.length;
+  const docImg=imgs.docImg;
+  const ticketImgs=imgs.ticketImgs;
   return `
     <div class="header"><button class="btn-back" id="btnBack">←</button><span style="font-weight:700;font-size:16px">Detalle</span><button class="btn-delete" id="btnDelete">🗑</button></div>
     <div class="page">
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"><button class="btn-primary" id="btnEditar">✏️ Editar</button><button class="btn-secondary" id="btnShareOnlyText">💬 Texto</button></div>
       <div style="background:#1a1a1a;border-radius:16px;padding:20px;margin-bottom:16px;border:1px solid #2a2a2a"><div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;gap:8px"><div><div style="font-size:18px;font-weight:800">${d.nombre}</div>${d.rut?`<div style="color:#888;font-size:13px">RUT: ${d.rut}</div>`:""}</div>${badge(d.estado)}</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">${d.nDoc?`<span class="pill">📄 N° ${d.nDoc}</span>`:""}${d.tracking?`<span class="pill">🚚 ${d.tracking}</span>`:""}${ticketImgs.length?`<span class="pill">🧾 ${ticketImgs.length} ticket${ticketImgs.length>1?"s":""}</span>`:`<span class="pill">🧾 Sin ticket</span>`}</div><div class="row"><span class="lbl">Tipo</span><span class="val">${d.tipoCompra==="importacion"?"🌏 Importación":"🇨🇱 Compra nacional"}</span></div>${empresaLabel?`<div class="row"><span class="lbl">Empresa</span><span class="val">${empresaLabel}</span></div>`:""}<div class="row"><span class="lbl">Destino</span><span class="val">${destinoLabel}</span></div>${agenciaLabel?`<div class="row"><span class="lbl">Agencia</span><span class="val">${agenciaLabel}</span></div>`:""}${d.direccionDestino?`<div class="row"><span class="lbl">Dirección</span><span class="val">${d.direccionDestino}</span></div>`:""}${d.region?`<div class="row"><span class="lbl">Región</span><span class="val">${d.region}</span></div>`:""}${d.bultos?`<div class="row"><span class="lbl">Bultos</span><span class="val">${d.bultos}</span></div>`:""}${d.notas?`<div class="row"><span class="lbl">Notas</span><span class="val">${d.notas}</span></div>`:""}<div class="row"><span class="lbl">Ingresado</span><span class="val">${d.fecha||""}</span></div></div>
       <div style="font-size:13px;color:#aaa;font-weight:700;margin:16px 0 10px">DOCUMENTO ORIGINAL</div>
-      ${d.docImg?`<div class="gallery"><div class="thumb" data-doc-open="1"><img src="${d.docImg}" alt="Documento" /><div class="thumb-label">Documento</div></div></div>`:`<div style="color:#555;font-size:13px;margin-bottom:16px">Sin documento adjunto.</div>`}
+      ${docImg?`<div class="gallery"><div class="thumb" data-doc-open="1"><img src="${docImg}" alt="Documento" /><div class="thumb-label">Documento</div></div></div>`:cargandoImgs?`<div style="color:#777;font-size:13px;margin-bottom:16px">⏳ Cargando foto...</div>`:`<div style="color:#555;font-size:13px;margin-bottom:16px">Sin documento adjunto.</div>`}
       <div style="font-size:13px;color:#aaa;font-weight:700;margin:16px 0 10px">CAMBIAR ESTADO</div>
       ${Object.entries(ESTADOS).map(([k,v])=>`<button class="btn-estado" data-estado="${k}" data-fbkey="${d.fbKey||""}" style="color:${v.color};border-color:${d.estado===k?v.color:"#333"};background:${d.estado===k?v.bg:"#1a1a1a"}">${d.estado===k?"✓ ":""}${v.label}</button>`).join("")}
       <div style="font-size:13px;color:#aaa;font-weight:700;margin:18px 0 10px">TRACKING</div>
@@ -937,7 +1002,7 @@ function renderDetalle(){
       </div>
       ${state.ticketStatusId===d.id && state.ticketStatusMessage?`<div class="banner ${state.ticketStatusType==="warn"?"warn":"info"}" style="margin:0 0 12px 0;max-width:none">${state.ticketStatusMessage}</div>`:""}
       <div style="font-size:13px;color:#aaa;font-weight:700;margin:18px 0 10px">TICKETS DE ENTREGA</div>
-      ${ticketImgs.length?`<div class="gallery" style="margin-bottom:10px">${ticketImgs.map((img,idx)=>`<div class="thumb" data-ticket-open="${idx}"><img src="${img}" alt="Ticket ${idx+1}" /><div class="thumb-label">Ticket ${idx+1}</div></div>`).join("")}</div><div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap"><button id="btnWhatsapp" class="btn-primary" style="background:#25D366">📲 WhatsApp</button><button id="btnDescargarTodo" class="btn-secondary">⬇️ Descargar ticket principal</button></div>`:`<div style="color:#555;font-size:13px;margin-bottom:10px">No hay foto del ticket aún.</div>`}
+      ${ticketImgs.length?`<div class="gallery" style="margin-bottom:10px">${ticketImgs.map((img,idx)=>`<div class="thumb" data-ticket-open="${idx}"><img src="${img}" alt="Ticket ${idx+1}" /><div class="thumb-label">Ticket ${idx+1}</div></div>`).join("")}</div><div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap"><button id="btnWhatsapp" class="btn-primary" style="background:#25D366">📲 WhatsApp</button><button id="btnDescargarTodo" class="btn-secondary">⬇️ Descargar ticket principal</button></div>`:cargandoImgs?`<div style="color:#777;font-size:13px;margin-bottom:10px">⏳ Cargando foto(s)...</div>`:`<div style="color:#555;font-size:13px;margin-bottom:10px">No hay foto del ticket aún.</div>`}
       <div class="upload-area" id="ticketUpload" style="margin-bottom:8px"><div style="font-size:24px">📷</div><div style="color:#ddd;font-size:13px;margin-top:4px;font-weight:700">${ticketImgs.length?"Agregar / cambiar ticket(s)":"Subir ticket(s)"}</div><div style="color:#777;font-size:12px;margin-top:6px">Puedes subir varias fotos. En FedEx, sube las 2.</div></div>
       <div style="text-align:center;font-size:12px;color:#555;margin-bottom:16px">o pega una imagen con <span class="kdb">Ctrl+V</span></div>
       <input type="file" id="ticketFileInput" accept="image/*" multiple capture="environment" style="display:none" />
@@ -947,10 +1012,16 @@ function renderDetalle(){
 }
 
 function bindDetalle(){
-  const d=state.despachos.find(x=>x.id===state.selectedId); if(!d) return; const ticketImgs=Array.isArray(d.ticketImgs)?d.ticketImgs:(d.ticketImg?[d.ticketImg]:[]);
+  const d=state.despachos.find(x=>x.id===state.selectedId); if(!d) return;
+  const imgs=getImgsFor(d); const docImg=imgs.docImg; const ticketImgs=imgs.ticketImgs;
   document.getElementById("btnBack").onclick=()=>setState({view:"lista"});
   document.getElementById("btnDelete").onclick=()=>{ if(confirm("¿Eliminar este despacho?")) dbEliminar(state.selectedId,d?.fbKey); };
-  document.getElementById("btnEditar").onclick=()=>{ setState({view:"nuevo",form:{...emptyForm(),...d,imgPreview:d.docImg||null,ticketImgs:[...ticketImgs],ticketImg:ticketImgs[0]||""}}); };
+  document.getElementById("btnEditar").onclick=async()=>{
+    const btn=document.getElementById("btnEditar"); const original=btn.textContent;
+    btn.disabled=true; btn.textContent="Cargando...";
+    const fresh=await fetchImgsNow(d.fbKey);
+    setState({view:"nuevo",form:{...emptyForm(),...d,imgPreview:fresh.docImg||null,ticketImgs:[...fresh.ticketImgs],ticketImg:fresh.ticketImgs[0]||""}});
+  };
   const btnText=document.getElementById("btnShareOnlyText"); if(btnText){ btnText.onclick=()=>window.open("https://api.whatsapp.com/send?text="+encodeURIComponent(buildWhatsappMessage(d)),"_blank"); }
   const btnGuardarTracking=document.getElementById("btnGuardarTracking");
   if(btnGuardarTracking){
@@ -966,7 +1037,7 @@ function bindDetalle(){
       setTimeout(bindDetalle,0);
     };
   }
-  document.querySelectorAll("[data-doc-open]").forEach(el=>{ el.onclick=()=>openImageOverlay(d.docImg); });
+  document.querySelectorAll("[data-doc-open]").forEach(el=>{ el.onclick=()=>openImageOverlay(docImg); });
   document.querySelectorAll("[data-ticket-open]").forEach(el=>{ const idx=+el.dataset.ticketOpen; el.onclick=()=>openImageOverlay(ticketImgs[idx]); });
   document.querySelectorAll(".btn-estado").forEach(btn=>{ btn.onclick=()=>{ const nuevoEstado=btn.dataset.estado; if(nuevoEstado==="entregado" && !ticketImgs.length){ const seguir=confirm("Este despacho se marcará como entregado sin ticket. ¿Continuar?"); if(!seguir) return; } dbEstado(state.selectedId,btn.dataset.fbkey,nuevoEstado); }; });
   const btnWa=document.getElementById("btnWhatsapp"); if(btnWa){ btnWa.onclick=async(e)=>{ e.preventDefault(); const mensaje=buildWhatsappMessage(d); try{ if(ticketImgs.length && navigator.share){ const files=[]; for(let i=0;i<ticketImgs.length;i++){ const res=await fetch(ticketImgs[i]); const blob=await res.blob(); files.push(new File([blob],filenameForTicket(d,i),{type:blob.type||"image/jpeg"})); } await navigator.share({text:mensaje,files}); } else if(navigator.share){ await navigator.share({text:mensaje}); } else { window.open("https://api.whatsapp.com/send?text="+encodeURIComponent(mensaje),"_blank"); } }catch(err){ if(err.name!=="AbortError") window.open("https://api.whatsapp.com/send?text="+encodeURIComponent(mensaje),"_blank"); }; }; }
@@ -987,17 +1058,18 @@ async function guardarTickets(files){
   render();
   setTimeout(bindDetalle,0);
 
-  let ticketImgsActuales=Array.isArray(d.ticketImgs)?[...d.ticketImgs]:(d.ticketImg?[d.ticketImg]:[]);
+  const actuales=await fetchImgsNow(d.fbKey);
+  let ticketImgsActuales=Array.isArray(actuales.ticketImgs)&&actuales.ticketImgs.length?[...actuales.ticketImgs]:(Array.isArray(d.ticketImgs)?[...d.ticketImgs]:(d.ticketImg?[d.ticketImg]:[]));
   const nuevasImgs=[];
   for(const file of files){
     if(!file.type.startsWith("image/")) continue;
     try{
       const compressed=await resizeImage(file,1600,0.75);
-      const url=await uploadImageToStorage(compressed,"tickets");
+      const url=await blobToDataURL(compressed);
       nuevasImgs.push(url);
     }catch(err){
-      console.error("Error subiendo ticket",err);
-      state.ticketStatusId=d.id; state.ticketStatusType="error"; state.ticketStatusMessage="No se pudo subir una de las fotos"; render(); setTimeout(bindDetalle,0);
+      console.error("Error comprimiendo ticket",err);
+      state.ticketStatusId=d.id; state.ticketStatusType="error"; state.ticketStatusMessage="No se pudo procesar una de las fotos"; render(); setTimeout(bindDetalle,0);
     }
   }
 
