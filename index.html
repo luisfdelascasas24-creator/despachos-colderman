@@ -1151,7 +1151,10 @@ async function activarNotificaciones(){
     if(permiso!=="granted"){ showToast("No diste permiso para las notificaciones"); render(); return; }
     if(!window._messaging){ showToast("No se pudo iniciar el servicio de notificaciones"); render(); return; }
     if(!VAPID_KEY || VAPID_KEY==="PON_AQUI_TU_VAPID_KEY"){ showToast("Falta configurar la clave VAPID"); render(); return; }
-    const reg=await navigator.serviceWorker.ready;
+    const reg=await Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise((_,rej)=>setTimeout(()=>rej(new Error("Tiempo de espera agotado esperando el service worker")),10000))
+    ]);
     const token=await window._messaging.getToken({vapidKey:VAPID_KEY, serviceWorkerRegistration:reg});
     if(token && window._db){
       await window._db.ref("fcmTokens/"+token).set({ts:Date.now()});
@@ -1168,9 +1171,9 @@ function registerServiceWorker(){
   if(!('serviceWorker' in navigator)) return;
 
   const swCode = `
-    importScripts('https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js');
-    importScripts('https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js');
     try{
+      importScripts('https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js');
+      importScripts('https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js');
       firebase.initializeApp(${JSON.stringify(firebaseConfig)});
       const messaging = firebase.messaging();
       messaging.onBackgroundMessage((payload) => {
