@@ -12,6 +12,7 @@
 
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
   <script>
     const firebaseConfig = {
       apiKey: "AIzaSyAaXhbTngCzxcXdo3i-mfwy_kG2ehNS4sc",
@@ -22,8 +23,11 @@
       messagingSenderId: "665527276782",
       appId: "1:665527276782:web:60503cd5580d8a78078fff"
     };
+    // Pégame aquí la "clave pública VAPID" que sacas de Firebase Console → Configuración del proyecto → Cloud Messaging → Certificados push web
+    const VAPID_KEY = "BOp6pOmRoGqll1SVWCjTJLsaHSGx1QhPga1NhB-OfL84CW6hzHeA2p87cE84lY9ukPxLAQGK8PtO0r8Qbwbjhqc";
     firebase.initializeApp(firebaseConfig);
     window._db = firebase.database();
+    try{ window._messaging = firebase.messaging(); }catch(e){ window._messaging = null; }
     window._firebaseReady = true;
     window.dispatchEvent(new Event("firebaseReady"));
   </script>
@@ -231,7 +235,9 @@ let state={
   canInstall:false,
   ticketStatusId:null,
   ticketStatusMessage:"",
-  ticketStatusType:"info"
+  ticketStatusType:"info",
+  notifSupported:('Notification' in window) && ('serviceWorker' in navigator),
+  notifPermission:('Notification' in window)?Notification.permission:"unsupported"
 };
 
 function showToast(msg){
@@ -845,6 +851,8 @@ function renderLista(){
     </div>
 
     ${state.canInstall?`<div class="install-banner"><div class="install-banner-text"><strong>Instala la app</strong> y úsala como si fuera una app del celular.</div><button class="btn-install" id="btnInstallApp">📲 Instalar app</button></div>`:""}
+    ${(state.notifSupported && state.notifPermission!=="granted")?`<div class="install-banner"><div class="install-banner-text"><strong>Activa las notificaciones</strong> y recibe un aviso cuando llegue un despacho nuevo, aunque la app esté cerrada.</div><button class="btn-install" id="btnActivarNotif">🔔 Activar</button></div>`:""}
+    ${state.notifPermission==="granted"?`<div style="font-size:12px;color:#5cd65c;margin-bottom:10px">🔔 Notificaciones activadas</div>`:""}
 
     ${pendientesAtrasados.length>0?`<div class="banner warn">⚠️ Tienes <strong>${pendientesAtrasados.length}</strong> despacho${pendientesAtrasados.length>1?"s":""} pendiente${pendientesAtrasados.length>1?"s":""} de días anteriores</div>`:""}
     ${sinTicket.length>0?`<div class="banner info">🧾 Hay <strong>${sinTicket.length}</strong> despacho${sinTicket.length>1?"s":""} entregado${sinTicket.length>1?"s":""} sin ticket</div>`:""}
@@ -904,6 +912,8 @@ function bindLista(){
   if(btnInstall) btnInstall.onclick=triggerInstall;
   document.getElementById("btnNuevo").onclick=()=>setState({view:"nuevo",form:emptyForm()});
   document.getElementById("btnExport").onclick=exportCSV;
+  const btnActivarNotif=document.getElementById("btnActivarNotif");
+  if(btnActivarNotif) btnActivarNotif.onclick=activarNotificaciones;
   Object.keys(ESTADOS).forEach(k=>{ document.getElementById("cnt-"+k).onclick=()=>setState({filtro:state.filtro===k?"todos":k}); });
   document.querySelectorAll(".card[data-id]").forEach(el=>{ el.onclick=(e)=>{ if(e.target.closest(".quick-wa")) return; setState({view:"detalle",selectedId:+el.dataset.id}); }; });
   document.querySelectorAll(".quick-wa").forEach(btn=>{ btn.onclick=(e)=>{ e.stopPropagation(); const d=state.despachos.find(x=>x.id===+btn.dataset.quickwa); if(d) triggerQuickShare(d); }; });
@@ -1132,10 +1142,54 @@ async function guardarTickets(files){
   },120);
 }
 
+async function activarNotificaciones(){
+  if(!state.notifSupported){ showToast("Tu navegador no soporta notificaciones"); return; }
+  const btn=document.getElementById("btnActivarNotif"); if(btn){ btn.disabled=true; btn.textContent="Activando..."; }
+  try{
+    const permiso=await Notification.requestPermission();
+    state.notifPermission=permiso;
+    if(permiso!=="granted"){ showToast("No diste permiso para las notificaciones"); render(); return; }
+    if(!window._messaging){ showToast("No se pudo iniciar el servicio de notificaciones"); render(); return; }
+    if(!VAPID_KEY || VAPID_KEY==="PON_AQUI_TU_VAPID_KEY"){ showToast("Falta configurar la clave VAPID"); render(); return; }
+    const reg=await navigator.serviceWorker.ready;
+    const token=await window._messaging.getToken({vapidKey:VAPID_KEY, serviceWorkerRegistration:reg});
+    if(token && window._db){
+      await window._db.ref("fcmTokens/"+token).set({ts:Date.now()});
+      showToast("🔔 Notificaciones activadas");
+    }
+  }catch(err){
+    console.error("Error activando notificaciones",err);
+    showToast("No se pudo activar las notificaciones");
+  }
+  render();
+}
+
 function registerServiceWorker(){
   if(!('serviceWorker' in navigator)) return;
 
   const swCode = `
+    importScripts('https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js');
+    importScripts('https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js');
+    try{
+      firebase.initializeApp(${JSON.stringify(firebaseConfig)});
+      const messaging = firebase.messaging();
+      messaging.onBackgroundMessage((payload) => {
+        const title = (payload.notification && payload.notification.title) || 'Despachos Colderman';
+        const body = (payload.notification && payload.notification.body) || '';
+        self.registration.showNotification(title, { body, icon: './icon.png' });
+      });
+    }catch(e){ /* mensajería no disponible en este navegador */ }
+
+    self.addEventListener('notificationclick', event => {
+      event.notification.close();
+      event.waitUntil(
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+          for (const c of list) { if ('focus' in c) return c.focus(); }
+          if (clients.openWindow) return clients.openWindow('./');
+        })
+      );
+    });
+
     const CACHE_NAME = 'despachos-colderman-v1';
     const APP_SHELL = ['./'];
 
