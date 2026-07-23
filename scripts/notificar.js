@@ -22,7 +22,7 @@ function enviarNotificacionOneSignal(titulo, mensaje) {
   return new Promise((resolve, reject) => {
     const payload = JSON.stringify({
       app_id: ONESIGNAL_APP_ID,
-      included_segments: ["Subscribed Users"],
+      included_segments: ["Total Subscriptions"],
       headings: { en: titulo, es: titulo },
       contents: { en: mensaje, es: mensaje }
     });
