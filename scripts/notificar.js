@@ -1,6 +1,9 @@
 const admin = require('firebase-admin');
+const https = require('https');
 
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+const ONESIGNAL_APP_ID = process.env.ONESIGNAL_APP_ID;
+const ONESIGNAL_REST_API_KEY = process.env.ONESIGNAL_REST_API_KEY;
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
@@ -9,13 +12,57 @@ admin.initializeApp({
 
 const db = admin.database();
 
-function destinoLabel(d){
-  if(d.destino === "provincia") return "Envío a provincia";
-  if(d.destino === "oficina") return "Recepción en oficina";
+function destinoLabel(d) {
+  if (d.destino === "provincia") return "Envío a provincia";
+  if (d.destino === "oficina") return "Recepción en oficina";
   return "Recojo en bodega";
 }
 
-async function main(){
+function enviarNotificacionOneSignal(titulo, mensaje) {
+  return new Promise((resolve, reject) => {
+    const payload = JSON.stringify({
+      app_id: ONESIGNAL_APP_ID,
+      included_segments: ["Subscribed Users"],
+      headings: { en: titulo, es: titulo },
+      contents: { en: mensaje, es: mensaje }
+    });
+
+    const req = https.request(
+      {
+        hostname: 'onesignal.com',
+        path: '/api/v1/notifications',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Authorization': `Basic ${ONESIGNAL_REST_API_KEY}`,
+          'Content-Length': Buffer.byteLength(payload)
+        }
+      },
+      res => {
+        let body = '';
+        res.on('data', chunk => { body += chunk; });
+        res.on('end', () => {
+          try {
+            const parsed = JSON.parse(body);
+            resolve({ status: res.statusCode, body: parsed });
+          } catch (e) {
+            resolve({ status: res.statusCode, body });
+          }
+        });
+      }
+    );
+    req.on('error', reject);
+    req.write(payload);
+    req.end();
+  });
+}
+
+async function main() {
+  if (!ONESIGNAL_APP_ID || !ONESIGNAL_REST_API_KEY) {
+    console.error('Faltan las variables ONESIGNAL_APP_ID o ONESIGNAL_REST_API_KEY.');
+    process.exit(1);
+  }
+
   const metaSnap = await db.ref('meta/lastNotifiedTs').once('value');
   const lastTs = metaSnap.val() || 0;
 
@@ -33,44 +80,19 @@ async function main(){
 
   console.log(`Encontrados ${nuevos.length} despacho(s) nuevo(s).`);
 
-  const tokensSnap = await db.ref('fcmTokens').once('value');
-  const tokensVal = tokensSnap.val() || {};
-  const tokens = Object.keys(tokensVal);
-
   let maxTs = lastTs;
   for (const d of nuevos) {
     if ((d.ts || 0) > maxTs) maxTs = d.ts;
   }
 
-  if (tokens.length === 0) {
-    console.log('No hay dispositivos con notificaciones activadas. Se avanza el marcador igual.');
-    await db.ref('meta/lastNotifiedTs').set(maxTs);
-    return;
-  }
-
   for (const d of nuevos) {
-    const message = {
-      notification: {
-        title: 'Nuevo despacho',
-        body: `${d.nombre || 'Cliente'} — ${destinoLabel(d)}`
-      },
-      tokens
-    };
+    const titulo = 'Nuevo despacho';
+    const mensaje = `${d.nombre || 'Cliente'} — ${destinoLabel(d)}`;
     try {
-      const resp = await admin.messaging().sendEachForMulticast(message);
-      console.log(`"${d.nombre}": ${resp.successCount} ok, ${resp.failureCount} fallidas`);
-      const borrados = [];
-      resp.responses.forEach((r, i) => {
-        if (!r.success) {
-          const code = r.error && r.error.code;
-          if (code === 'messaging/invalid-registration-token' || code === 'messaging/registration-token-not-registered') {
-            borrados.push(db.ref('fcmTokens/' + tokens[i]).remove());
-          }
-        }
-      });
-      if (borrados.length) await Promise.all(borrados);
+      const resp = await enviarNotificacionOneSignal(titulo, mensaje);
+      console.log(`"${d.nombre}": HTTP ${resp.status}`, JSON.stringify(resp.body));
     } catch (err) {
-      console.error('Error enviando notificación:', err.message);
+      console.error(`Error enviando notificación para "${d.nombre}":`, err.message);
     }
   }
 
