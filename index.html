@@ -25,6 +25,8 @@
     };
     // Pégame aquí la "clave pública VAPID" que sacas de Firebase Console → Configuración del proyecto → Cloud Messaging → Certificados push web
     const VAPID_KEY = "BOp6pOmRoGqll1SVWCjTJLsaHSGx1QhPga1NhB-OfL84CW6hzHeA2p87cE84lY9ukPxLAQGK8PtO0r8Qbwbjhqc";
+    // Token limitado (solo "Contents" y "Actions" de este repo) para disparar la notificación al instante
+    const GITHUB_DISPATCH_TOKEN = "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";
     firebase.initializeApp(firebaseConfig);
     window._db = firebase.database();
     try{ window._messaging = firebase.messaging(); }catch(e){ window._messaging = null; }
@@ -572,6 +574,20 @@ function initStorage(){
   }
 }
 function saveLocal(){ localStorage.setItem("dcold",JSON.stringify(state.despachos)); }
+// Le avisa a GitHub Actions al instante que hay un despacho nuevo, para no esperar el chequeo cada 10 min
+function dispararNotificacionInstantanea(){
+  if(!GITHUB_DISPATCH_TOKEN) return;
+  fetch("https://api.github.com/repos/luisfdelascasas24-creator/despachos-colderman/dispatches",{
+    method:"POST",
+    headers:{
+      "Accept":"application/vnd.github+json",
+      "Authorization":"Bearer "+GITHUB_DISPATCH_TOKEN,
+      "Content-Type":"application/json"
+    },
+    body:JSON.stringify({event_type:"nuevo-despacho"})
+  }).catch(()=>{ /* si falla, igual lo va a agarrar el chequeo automático cada 10 min */ });
+}
+
 function dbGuardar(d){
   const ticketImgs=Array.isArray(d.ticketImgs)?d.ticketImgs:(d.ticketImg?[d.ticketImg]:[]);
   const docImg=d.docImg||"";
@@ -583,6 +599,7 @@ function dbGuardar(d){
     const key=ref.key;
     if(docImg||ticketImgs.length){ window._db.ref("despachosImgs/"+key).set({docImg,ticketImgs}); }
     state.imgCache=state.imgCache||{}; state.imgCache[key]={docImg,ticketImgs};
+    dispararNotificacionInstantanea();
   } else {
     state.despachos=[{...payload,docImg,ticketImgs,ticketImg:ticketImgs[0]||""},...state.despachos]; saveLocal(); render();
   }
