@@ -724,8 +724,54 @@ async function ocrImage(file,lang="spa"){
   return text;
 }
 
+// Carga PDF.js solo la primera vez que se sube un PDF
+let _pdfjsLoadPromise=null;
+function loadPdfJs(){
+  if(window.pdfjsLib) return Promise.resolve();
+  if(_pdfjsLoadPromise) return _pdfjsLoadPromise;
+  _pdfjsLoadPromise=new Promise((resolve,reject)=>{
+    const s=document.createElement("script");
+    s.src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js";
+    s.onload=()=>{
+      try{ window.pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js"; resolve(); }
+      catch(e){ reject(e); }
+    };
+    s.onerror=()=>reject(new Error("No se pudo cargar el lector de PDF"));
+    document.head.appendChild(s);
+  });
+  return _pdfjsLoadPromise;
+}
+
+// Convierte la primera página de un PDF en una imagen (para poder mostrarla y leerla con OCR igual que una foto)
+async function pdfPrimeraPaginaABlob(file){
+  await loadPdfJs();
+  const arrayBuffer=await file.arrayBuffer();
+  const pdf=await window.pdfjsLib.getDocument({data:arrayBuffer}).promise;
+  const page=await pdf.getPage(1);
+  const viewport=page.getViewport({scale:2});
+  const canvas=document.createElement("canvas");
+  canvas.width=viewport.width; canvas.height=viewport.height;
+  const ctx=canvas.getContext("2d");
+  await page.render({canvasContext:ctx,viewport}).promise;
+  return new Promise((resolve,reject)=>{
+    canvas.toBlob(blob=>blob?resolve(blob):reject(new Error("No se pudo convertir el PDF a imagen")),"image/jpeg",0.9);
+  });
+}
+
 async function handleFile(file){
   if(!file) return;
+  if(file.type==="application/pdf"){
+    state.form.extractError=""; state.form.extractSuccess=""; state.form.extracting=true; state.form.statusMessage="Convirtiendo PDF..."; render(); setTimeout(bindNuevo,0);
+    try{
+      file=await pdfPrimeraPaginaABlob(file);
+    }catch(err){
+      console.error("Error convirtiendo PDF",err);
+      state.form.extracting=false; state.form.statusMessage="";
+      state.form.extractError="No se pudo leer el PDF. Prueba subiendo una foto en su lugar.";
+      render(); setTimeout(bindNuevo,0);
+      return;
+    }
+  }
   state.form.extractError=""; state.form.extractSuccess=""; state.form.extracting=true; state.form.statusMessage="Procesando captura..."; render(); setTimeout(bindNuevo,0);
   const reader=new FileReader();
   reader.onload=async e=>{
@@ -952,8 +998,8 @@ function renderNuevo(){
   return `
     <div class="header"><button class="btn-back" id="btnBack">←</button><span style="font-weight:700;font-size:16px">${isEdit?"Editar despacho":"Nuevo Despacho"}</span><div style="width:40px"></div></div>
     <div class="page">
-      <div class="upload-area" id="uploadArea" tabindex="0">${f.imgPreview?`<img src="${f.imgPreview}" alt="doc" />`:`<div style="font-size:34px">📎</div><div style="color:#ddd;font-size:14px;margin-top:8px;font-weight:700">Sube, arrastra o pega con Ctrl+V tu captura</div><div style="color:#777;font-size:12px;margin-top:6px">Factura, cotización o boleta</div>`}</div>
-      <input type="file" id="fileInput" accept="image/*" style="display:none" />
+      <div class="upload-area" id="uploadArea" tabindex="0">${f.imgPreview?`<img src="${f.imgPreview}" alt="doc" />`:`<div style="font-size:34px">📎</div><div style="color:#ddd;font-size:14px;margin-top:8px;font-weight:700">Sube, arrastra o pega con Ctrl+V tu captura</div><div style="color:#777;font-size:12px;margin-top:6px">Factura, cotización, boleta o PDF</div>`}</div>
+      <input type="file" id="fileInput" accept="image/*,application/pdf" style="display:none" />
       ${f.extracting?`<div class="extracting">⏳ ${f.statusMessage||"Extrayendo datos..."}</div>`:""}
       ${f.extractSuccess?`<div class="extract-ok">${f.extractSuccess}</div>`:""}
       ${f.extractError?`<div class="extract-error">${f.extractError}</div>`:""}
@@ -980,7 +1026,7 @@ function bindNuevo(){
   fileInput.onchange=e=>handleFile(e.target.files[0]);
   uploadArea.addEventListener("dragover",e=>{ e.preventDefault(); uploadArea.classList.add("dragover"); });
   uploadArea.addEventListener("dragleave",()=>uploadArea.classList.remove("dragover"));
-  uploadArea.addEventListener("drop",e=>{ e.preventDefault(); uploadArea.classList.remove("dragover"); const file=e.dataTransfer.files?.[0]; if(file && file.type.startsWith("image/")) handleFile(file); });
+  uploadArea.addEventListener("drop",e=>{ e.preventDefault(); uploadArea.classList.remove("dragover"); const file=e.dataTransfer.files?.[0]; if(file && (file.type.startsWith("image/")||file.type==="application/pdf")) handleFile(file); });
   const onPasteNuevo=e=>{ const items=e.clipboardData?.items; if(!items) return; for(const item of items){ if(item.type.startsWith("image/")){ e.preventDefault(); handleFile(item.getAsFile()); break; } } };
   document.addEventListener("paste",onPasteNuevo); window._pasteNuevoCleanup=()=>document.removeEventListener("paste",onPasteNuevo);
   document.getElementById("fNombre").oninput=e=>{state.form.nombre=e.target.value;};
