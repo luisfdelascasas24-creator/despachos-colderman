@@ -3,6 +3,8 @@ name: Notificar despachos nuevos
 on:
   schedule:
     - cron: '*/10 * * * *'
+  repository_dispatch:
+    types: [nuevo-despacho]
   workflow_dispatch: {}
 
 jobs:
