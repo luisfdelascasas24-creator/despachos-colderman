@@ -26,7 +26,8 @@
     // Pégame aquí la "clave pública VAPID" que sacas de Firebase Console → Configuración del proyecto → Cloud Messaging → Certificados push web
     const VAPID_KEY = "BOp6pOmRoGqll1SVWCjTJLsaHSGx1QhPga1NhB-OfL84CW6hzHeA2p87cE84lY9ukPxLAQGK8PtO0r8Qbwbjhqc";
     // Token limitado (solo "Contents" y "Actions" de este repo) para disparar la notificación al instante
-    const GITHUB_DISPATCH_TOKEN = "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";
+    // Clave compartida (no sensible por sí sola) para hablarle a nuestro Cloudflare Worker
+    const APP_SHARED_SECRET = "desp-col-2026-xk91";
     firebase.initializeApp(firebaseConfig);
     window._db = firebase.database();
     try{ window._messaging = firebase.messaging(); }catch(e){ window._messaging = null; }
@@ -575,16 +576,15 @@ function initStorage(){
 }
 function saveLocal(){ localStorage.setItem("dcold",JSON.stringify(state.despachos)); }
 // Le avisa a GitHub Actions al instante que hay un despacho nuevo, para no esperar el chequeo cada 10 min
+// (pasa por nuestro Cloudflare Worker, que guarda el token real de forma segura y oculta)
 function dispararNotificacionInstantanea(){
-  if(!GITHUB_DISPATCH_TOKEN) return;
-  fetch("https://api.github.com/repos/luisfdelascasas24-creator/despachos-colderman/dispatches",{
+  fetch("https://withered-mud-050d.luisfdelascasas24.workers.dev/",{
     method:"POST",
     headers:{
-      "Accept":"application/vnd.github+json",
-      "Authorization":"Bearer "+GITHUB_DISPATCH_TOKEN,
-      "Content-Type":"application/json"
+      "Content-Type":"application/json",
+      "X-App-Secret":APP_SHARED_SECRET
     },
-    body:JSON.stringify({event_type:"nuevo-despacho"})
+    body:JSON.stringify({})
   }).catch(()=>{ /* si falla, igual lo va a agarrar el chequeo automático cada 10 min */ });
 }
 
