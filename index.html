@@ -797,7 +797,7 @@ async function handleFile(file){
 async function guardar(){
   const f=state.form;
   if(!f.nombre.trim()){ showToast("Falta el nombre del cliente"); return; }
-  if(f.destino==="provincia" && !f.agencia){ showToast("Selecciona una agencia para provincia"); return; }
+  if(f.destino==="provincia" && !f.agencia){ showToast("Selecciona una agencia para región"); return; }
   const dup=findPossibleDuplicate(f);
   if(dup){ const seguir=confirm(`Parece duplicado:\n${dup.nombre}${dup.nDoc?" · N° "+dup.nDoc:""}\n\n¿Guardar igual?`); if(!seguir) return; }
 
@@ -854,7 +854,7 @@ function renderLista(){
   })();
 
   const cards=filtrados.length===0 ? `<div class="empty">${state.despachos.length===0?"No hay despachos. Agrega el primero.":"Sin resultados."}</div>` : filtrados.map(d=>{
-    const agenciaLabel=getAgencyLabel(d), empresaLabel=getEmpresaLabel(d), destinoLabel=d.destino==="provincia"?"Provincia":d.destino==="oficina"?"Oficina":"Bodega";
+    const agenciaLabel=getAgencyLabel(d), empresaLabel=getEmpresaLabel(d), destinoLabel=d.destino==="provincia"?"Región":d.destino==="oficina"?"Oficina":"Bodega";
     const atrasado=d.estado==="pendiente" && d.fecha!==hoy; const ticketCount=ticketCountFor(d);
     return `
       <div class="card list-card soft-fade" data-id="${d.id}" style="border-color:${atrasado?"rgba(239,68,68,.25)":"rgba(255,255,255,.07)"}">
@@ -1012,7 +1012,7 @@ function renderNuevo(){
       <div class="tabs"><div class="tab ${!isNacional?"active":""}" id="tabImport">🌏 Importación</div><div class="tab ${isNacional?"active":""}" id="tabNacional">🇨🇱 Compra nacional</div></div>
       ${isNacional?`<div class="field"><label>Empresa proveedora</label><select id="fEmpresaNacional"><option value="">Seleccionar empresa...</option>${EMPRESAS_NACIONAL.map(e=>`<option ${f.empresaNacional===e?"selected":""}>${e}</option>`).join("")}</select></div>${showEmpresaCustom?`<div class="field"><label>¿Cuál empresa?</label><input id="fEmpresaCustom" value="${f.empresaNacionalCustom||""}" placeholder="Nombre de la empresa" /></div>`:""}`:""}
       <div class="section-sep">Destino del envío</div>
-      <div class="tabs"><div class="tab ${isProvincia?"active":""}" id="tabProvincia">📦 Provincia</div><div class="tab ${f.destino==="oficina"?"active":""}" id="tabOficina">🏢 Oficina</div><div class="tab ${f.destino==="bodega"?"active":""}" id="tabBodega">🏭 Bodega</div></div>
+      <div class="tabs"><div class="tab ${isProvincia?"active":""}" id="tabProvincia">📦 Región</div><div class="tab ${f.destino==="oficina"?"active":""}" id="tabOficina">🏢 Oficina</div><div class="tab ${f.destino==="bodega"?"active":""}" id="tabBodega">🏭 Bodega</div></div>
       ${isProvincia?`<div class="field"><label>Agencia de envío</label><select id="fAgencia"><option value="">Seleccionar agencia...</option>${AGENCIAS.map(a=>`<option ${f.agencia===a?"selected":""}>${a}</option>`).join("")}</select></div>${showAgenciaCustom?`<div class="field"><label>¿Cuál agencia?</label><input id="fAgenciaCustom" value="${f.agenciaCustom||""}" placeholder="Nombre de la agencia" /></div>`:""}<div class="field"><label>Dirección / sucursal de destino</label><input id="fDireccion" value="${f.direccionDestino||""}" placeholder="Ej: Sucursal Starken Talca, Av. O'Higgins 123" /></div>`:`<div style="background:#1a1a1a;border-radius:12px;padding:12px;margin-bottom:14px;font-size:13px;color:#888">${f.destino==="oficina"?"🏢 El pedido se recibe en oficina.":"🏭 El pedido se recoge en bodega."}</div>`}
       <div class="field"><label>Notas adicionales</label><textarea id="fNotas" rows="2" placeholder="Observaciones...">${f.notas||""}</textarea></div>
       <button class="btn-primary" id="btnGuardar" style="width:100%;padding:14px;font-size:16px;margin-bottom:10px">${isEdit?"Guardar cambios":"Guardar despacho"}</button>
@@ -1056,7 +1056,7 @@ function bindNuevo(){
 function renderDetalle(){
   const d=state.despachos.find(x=>x.id===state.selectedId); if(!d) return renderLista();
   ensureImgsLoaded(d);
-  const empresaLabel=getEmpresaLabel(d), agenciaLabel=getAgencyLabel(d), destinoLabel=d.destino==="provincia"?"📦 Envío a provincia":d.destino==="oficina"?"🏢 Recepción en oficina":"🏭 Recojo en bodega";
+  const empresaLabel=getEmpresaLabel(d), agenciaLabel=getAgencyLabel(d), destinoLabel=d.destino==="provincia"?"📦 Envío a región":d.destino==="oficina"?"🏢 Recepción en oficina":"🏭 Recojo en bodega";
   const imgs=getImgsFor(d);
   const cargandoImgs=!state.imgCache?.[d.fbKey] && (d.hasDoc||d.ticketCount>0) && !imgs.docImg && !imgs.ticketImgs.length;
   const docImg=imgs.docImg;
