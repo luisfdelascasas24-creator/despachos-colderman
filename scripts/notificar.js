@@ -13,9 +13,13 @@ admin.initializeApp({
 const db = admin.database();
 
 function destinoLabel(d) {
-  if (d.destino === "provincia") return "Envío a provincia";
+  if (d.destino === "provincia") return d.agencia ? `Envío a región · ${d.agencia}` : "Envío a región";
   if (d.destino === "oficina") return "Recepción en oficina";
   return "Recojo en bodega";
+}
+
+function tipoCompraLabel(d) {
+  return d.tipoCompra === "importacion" ? "Importación" : "Compra nacional";
 }
 
 function enviarNotificacionOneSignal(titulo, mensaje) {
@@ -87,7 +91,7 @@ async function main() {
 
   for (const d of nuevos) {
     const titulo = 'Nuevo despacho';
-    const mensaje = `${d.nombre || 'Cliente'} — ${destinoLabel(d)}`;
+    const mensaje = `${d.nombre || 'Cliente'} · ${tipoCompraLabel(d)} · ${destinoLabel(d)}`;
     try {
       const resp = await enviarNotificacionOneSignal(titulo, mensaje);
       console.log(`"${d.nombre}": HTTP ${resp.status}`, JSON.stringify(resp.body));
