@@ -626,7 +626,7 @@ function dbActualizar(d){
     state.despachos=state.despachos.map(x=>x.id===d.id?completo:x); saveLocal(); render();
   }
 }
-function dbEstado(id,fbKey,estado){ const d=state.despachos.find(x=>x.id===id); if(!d) return; dbActualizar({...d,estado,historial:addHistory(d,"Estado cambiado",estado)}); showToast("Estado actualizado"); }
+function dbEstado(id,fbKey,estado){ const d=state.despachos.find(x=>x.id===id); if(!d) return; const emailActual=(window._auth && window._auth.currentUser && window._auth.currentUser.email) || ""; dbActualizar({...d,estado,editadoPor:emailActual,historial:addHistory(d,"Estado cambiado",`${estado}${emailActual?" · "+nombreDeUsuario(emailActual):""}`)}); showToast("Estado actualizado"); }
 function dbEliminar(id,fbKey){ if(state.useFirebase && fbKey){ window._db.ref("despachos/"+fbKey).remove(); window._db.ref("despachosImgs/"+fbKey).remove(); } else { state.despachos=state.despachos.filter(d=>d.id!==id); saveLocal(); } setState({view:"lista",selectedId:null}); showToast("Despacho eliminado"); }
 
 function setState(p){ if(window._pasteCleanup){window._pasteCleanup();window._pasteCleanup=null;} if(window._pasteNuevoCleanup){window._pasteNuevoCleanup();window._pasteNuevoCleanup=null;} Object.assign(state,p); render(); }
@@ -819,8 +819,9 @@ async function guardar(){
   }
 
   const existe=state.despachos.find(d=>d.id===f.id);
+  const emailActual=(window._auth && window._auth.currentUser && window._auth.currentUser.email) || "";
   const base={
-    id:existe?f.id:Date.now(), fbKey:existe?(f.fbKey||existe.fbKey||""):(f.fbKey||""), ts:Date.now(), nombre:sanitizeName(f.nombre.trim()), rut:f.rut.trim(), nDoc:(f.nDoc||"").trim(), bultos:f.bultos||"", tracking:(f.tracking||"").trim(), docImg:docImgUrl, tipoCompra:f.tipoCompra, empresaNacional:f.empresaNacional, empresaNacionalCustom:(f.empresaNacionalCustom||"").trim(), destino:f.destino, agencia:f.agencia, agenciaCustom:(f.agenciaCustom||"").trim(), direccionDestino:(f.direccionDestino||"").trim(), region:f.region||"", notas:(f.notas||"").trim(), ticketImgs:Array.isArray(f.ticketImgs)?f.ticketImgs:(f.ticketImg?[f.ticketImg]:[]), ticketImg:(Array.isArray(f.ticketImgs)?f.ticketImgs[0]:f.ticketImg)||"", estado:existe?(f.estado||existe.estado||"pendiente"):"pendiente", fecha:existe?(f.fecha||existe.fecha):new Date().toLocaleDateString("es-CL"), historial:existe?addHistory(existe,"Despacho editado","Se actualizaron datos del despacho"):addHistory({historial:[]},"Despacho creado","Creación inicial")
+    id:existe?f.id:Date.now(), fbKey:existe?(f.fbKey||existe.fbKey||""):(f.fbKey||""), ts:Date.now(), nombre:sanitizeName(f.nombre.trim()), rut:f.rut.trim(), nDoc:(f.nDoc||"").trim(), bultos:f.bultos||"", tracking:(f.tracking||"").trim(), docImg:docImgUrl, tipoCompra:f.tipoCompra, empresaNacional:f.empresaNacional, empresaNacionalCustom:(f.empresaNacionalCustom||"").trim(), destino:f.destino, agencia:f.agencia, agenciaCustom:(f.agenciaCustom||"").trim(), direccionDestino:(f.direccionDestino||"").trim(), region:f.region||"", notas:(f.notas||"").trim(), ticketImgs:Array.isArray(f.ticketImgs)?f.ticketImgs:(f.ticketImg?[f.ticketImg]:[]), ticketImg:(Array.isArray(f.ticketImgs)?f.ticketImgs[0]:f.ticketImg)||"", estado:existe?(f.estado||existe.estado||"pendiente"):"pendiente", fecha:existe?(f.fecha||existe.fecha):new Date().toLocaleDateString("es-CL"), creadoPor:existe?(existe.creadoPor||""):emailActual, editadoPor:existe?emailActual:"", historial:existe?addHistory(existe,"Despacho editado",`Se actualizaron datos del despacho${emailActual?" · "+nombreDeUsuario(emailActual):""}`):addHistory({historial:[]},"Despacho creado",`Creación inicial${emailActual?" · "+nombreDeUsuario(emailActual):""}`)
   };
   if(existe){ dbActualizar(base); showToast("Despacho editado"); } else { dbGuardar(base); showToast("Despacho guardado"); }
   setState({view:"lista",form:emptyForm()});
@@ -887,6 +888,10 @@ function renderLista(){
           <div class="info-row">
             <div>📍</div>
             <div><div class="info-label">Destino</div><div class="info-value">${destinoLabel}${d.direccionDestino?` · ${d.direccionDestino}`:""}</div></div>
+          </div>
+          <div class="info-row">
+            <div>👤</div>
+            <div><div class="info-label">Creado por</div><div class="info-value">${d.creadoPor?nombreDeUsuario(d.creadoPor):"-"}${d.editadoPor&&d.editadoPor!==d.creadoPor?` · últ. edición: ${nombreDeUsuario(d.editadoPor)}`:""}</div></div>
           </div>
           <div class="info-row">
             <div>📦</div>
@@ -1309,6 +1314,13 @@ function registerServiceWorker(){
 
 // Solo estas personas pueden entrar a la app
 const ALLOWED_EMAILS = ["luisfdelascasas24@gmail.com","javixodelascasas@gmail.com","delascasaseli@gmail.com","esalinascis10@gmail.com"];
+const NOMBRES_USUARIOS = {
+  "luisfdelascasas24@gmail.com":"Luis Felipe",
+  "javixodelascasas@gmail.com":"Javier",
+  "delascasaseli@gmail.com":"Elizabeth",
+  "esalinascis10@gmail.com":"Elsa"
+};
+function nombreDeUsuario(email){ return NOMBRES_USUARIOS[(email||"").toLowerCase()] || email || "Desconocido"; }
 
 function renderLogin(mensaje){
   const app=document.getElementById("app");
