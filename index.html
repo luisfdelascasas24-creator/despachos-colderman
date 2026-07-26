@@ -14,6 +14,16 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+  <script>
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    OneSignalDeferred.push(async function(OneSignal){
+      try{
+        await OneSignal.init({ appId: "50716c0f-96b3-4963-945b-fb047105e2ee" });
+        window._oneSignalReady = true;
+      }catch(e){ console.log("OneSignal Web no disponible", e); }
+    });
+  </script>
   <script>
     const firebaseConfig = {
       apiKey: "AIzaSyAaXhbTngCzxcXdo3i-mfwy_kG2ehNS4sc",
@@ -1224,20 +1234,17 @@ async function activarNotificaciones(){
   if(!state.notifSupported){ showToast("Tu navegador no soporta notificaciones"); return; }
   const btn=document.getElementById("btnActivarNotif"); if(btn){ btn.disabled=true; btn.textContent="Activando..."; }
   try{
-    const permiso=await Notification.requestPermission();
-    state.notifPermission=permiso;
-    if(permiso!=="granted"){ showToast("No diste permiso para las notificaciones"); render(); return; }
-    if(!window._messaging){ showToast("No se pudo iniciar el servicio de notificaciones"); render(); return; }
-    if(!VAPID_KEY || VAPID_KEY==="PON_AQUI_TU_VAPID_KEY"){ showToast("Falta configurar la clave VAPID"); render(); return; }
-    const reg=await Promise.race([
-      navigator.serviceWorker.ready,
-      new Promise((_,rej)=>setTimeout(()=>rej(new Error("Tiempo de espera agotado esperando el service worker")),10000))
-    ]);
-    const token=await window._messaging.getToken({vapidKey:VAPID_KEY, serviceWorkerRegistration:reg});
-    if(token && window._db){
-      await window._db.ref("fcmTokens/"+token).set({ts:Date.now()});
-      showToast("🔔 Notificaciones activadas");
-    }
+    await new Promise((resolve,reject)=>{
+      if(!window.OneSignalDeferred){ reject(new Error("OneSignal no está disponible")); return; }
+      const timeout=setTimeout(()=>reject(new Error("Tiempo de espera agotado")),10000);
+      window.OneSignalDeferred.push(async function(OneSignal){
+        try{ await OneSignal.Notifications.requestPermission(); clearTimeout(timeout); resolve(); }
+        catch(e){ clearTimeout(timeout); reject(e); }
+      });
+    });
+    state.notifPermission=Notification.permission;
+    if(state.notifPermission==="granted"){ showToast("🔔 Notificaciones activadas"); }
+    else { showToast("No diste permiso para las notificaciones"); }
   }catch(err){
     console.error("Error activando notificaciones",err);
     showToast("No se pudo activar las notificaciones");
