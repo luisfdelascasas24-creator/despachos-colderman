@@ -1368,7 +1368,7 @@ function arrancarApp(){
   _appYaArranco=true;
   setupDynamicManifest();
   setupInstallPrompt();
-  registerServiceWorker();
+  // registerServiceWorker(); // desactivado: chocaba con el service worker de OneSignal (mismo alcance/scope)
   if(window._firebaseReady) initStorage(); else { window.addEventListener("firebaseReady",initStorage); setTimeout(initStorage,3000); }
 }
 
