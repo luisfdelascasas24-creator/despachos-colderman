@@ -19,7 +19,11 @@
     window.OneSignalDeferred = window.OneSignalDeferred || [];
     OneSignalDeferred.push(async function(OneSignal){
       try{
-        await OneSignal.init({ appId: "50716c0f-96b3-4963-945b-fb047105e2ee" });
+        await OneSignal.init({
+  appId: "50716c0f-96b3-4963-945b-fb047105e2ee",
+  serviceWorkerPath: "OneSignalSDKWorker.js",
+  serviceWorkerParam: { scope: "/despachos-colderman/" }
+});
         window._oneSignalReady = true;
       }catch(e){ console.log("OneSignal Web no disponible", e); }
     });
