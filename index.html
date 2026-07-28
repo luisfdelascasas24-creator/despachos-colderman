@@ -1194,7 +1194,7 @@ async function guardarTickets(files){
     render();
     setTimeout(bindDetalle,0);
 
-    let trackingDetectado=String(nuevo.tracking||"").trim();
+    let trackingDetectado=String(nuevo.tracking||"").trim();=String(nuevo.tracking||"").trim();
     for(const file of files){
       try{
         const text=await ocrImage(file,"spa");
