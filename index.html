@@ -578,7 +578,7 @@ function initStorage(){
     state.useFirebase=true;
     window._db.ref("despachos").on("value",snap=>{
       const val=snap.val();
-      state.despachos=val?Object.entries(val).map(([k,v])=>({...v,fbKey:k,ticketImgs:Array.isArray(v.ticketImgs)?v.ticketImgs:(v.ticketImg?[v.ticketImg]:[])})):[];
+      state.despachos=val?Object.entries(val).map(([k,v])=>({...v,fbKey:k})):[];
       state.despachos.sort((a,b)=>(b.ts||0)-(a.ts||0));
       render();
     });
