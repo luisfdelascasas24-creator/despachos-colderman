@@ -204,6 +204,7 @@ const AGENCIAS=["Starken","Varmont","PDQ","Chevallier","FedEx","Chilexpress","Ra
 const EMPRESAS_NACIONAL=["Blescom","American Air","Esmeralda","Otra..."];
 const ESTADOS={
   pendiente:{label:"Pendiente",color:"#f59e0b",bg:"#2a1f00"},
+  empacado:{label:"Empacado 📦",color:"#3b82f6",bg:"#001a33"},
   entregado:{label:"Entregado ✓",color:"#10b981",bg:"#002a1a"},
   falta_doc:{label:"Falta documento",color:"#ef4444",bg:"#2a0000"},
 };
@@ -651,7 +652,7 @@ function dbEliminar(id,fbKey){ if(state.useFirebase && fbKey){ window._db.ref("d
 
 function setState(p){ if(window._pasteCleanup){window._pasteCleanup();window._pasteCleanup=null;} if(window._pasteNuevoCleanup){window._pasteNuevoCleanup();window._pasteNuevoCleanup=null;} Object.assign(state,p); render(); }
 function badge(e){ const v=ESTADOS[e]||ESTADOS.pendiente; return `<span class="badge" style="color:${v.color};border-color:${v.color};background:${v.bg}">${v.label}</span>`; }
-function counts(){ return { pendiente:state.despachos.filter(d=>d.estado==="pendiente").length, entregado:state.despachos.filter(d=>d.estado==="entregado").length, falta_doc:state.despachos.filter(d=>d.estado==="falta_doc").length }; }
+function counts(){ return { pendiente:state.despachos.filter(d=>d.estado==="pendiente").length, empacado:state.despachos.filter(d=>d.estado==="empacado").length, entregado:state.despachos.filter(d=>d.estado==="entregado").length, falta_doc:state.despachos.filter(d=>d.estado==="falta_doc").length }; }
 
 // Comprime/redimensiona una imagen antes de subirla, para no llenar Storage/DB de fotos pesadas
 function resizeImage(file,maxDim=1600,quality=0.75){
