@@ -304,7 +304,13 @@ function addHistory(despacho,tipo,nota=""){
   }, ...historial];
 }
 
-function openImageOverlay(src){
+function openImageOverlay(src,filename){
+  const overlay=document.createElement("div");
+  overlay.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px";
+  overlay.innerHTML=`<img src="${src}" style="max-width:100%;max-height:100%;border-radius:12px" /><a href="${src}" download="${filename||'documento.jpg'}" onclick="event.stopPropagation()" style="position:fixed;top:16px;right:64px;color:#fff;font-size:26px;text-decoration:none">⬇️</a><button style="position:fixed;top:16px;right:16px;background:none;border:none;color:#fff;font-size:30px;cursor:pointer">✕</button>`;
+  overlay.onclick=()=>overlay.remove();
+  document.body.appendChild(overlay);
+}
   const overlay=document.createElement("div");
   overlay.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px";
   overlay.innerHTML=`<img src="${src}" style="max-width:100%;max-height:100%;border-radius:12px" /><button style="position:fixed;top:16px;right:16px;background:none;border:none;color:#fff;font-size:30px;cursor:pointer">✕</button>`;
@@ -1139,7 +1145,7 @@ function bindDetalle(){
       setTimeout(bindDetalle,0);
     };
   }
-  document.querySelectorAll("[data-doc-open]").forEach(el=>{ el.onclick=()=>openImageOverlay(docImg); });
+  document.querySelectorAll("[data-doc-open]").forEach(el=>{ el.onclick=()=>openImageOverlay(docImg,`documento-${slugify(d.nombre)}.jpg`); });
   document.querySelectorAll("[data-ticket-open]").forEach(el=>{ const idx=+el.dataset.ticketOpen; el.onclick=()=>openImageOverlay(ticketImgs[idx]); });
   document.querySelectorAll(".btn-estado").forEach(btn=>{ btn.onclick=()=>{ const nuevoEstado=btn.dataset.estado; if(nuevoEstado==="entregado" && !ticketImgs.length){ const seguir=confirm("Este despacho se marcará como entregado sin ticket. ¿Continuar?"); if(!seguir) return; } dbEstado(state.selectedId,btn.dataset.fbkey,nuevoEstado); }; });
   const btnWa=document.getElementById("btnWhatsapp"); if(btnWa){ btnWa.onclick=async(e)=>{ e.preventDefault(); const mensaje=buildWhatsappMessage(d); try{ if(ticketImgs.length && navigator.share){ const files=[]; for(let i=0;i<ticketImgs.length;i++){ const res=await fetch(ticketImgs[i]); const blob=await res.blob(); files.push(new File([blob],filenameForTicket(d,i),{type:blob.type||"image/jpeg"})); } await navigator.share({text:mensaje,files}); } else if(navigator.share){ await navigator.share({text:mensaje}); } else { window.open("https://api.whatsapp.com/send?text="+encodeURIComponent(mensaje),"_blank"); } }catch(err){ if(err.name!=="AbortError") window.open("https://api.whatsapp.com/send?text="+encodeURIComponent(mensaje),"_blank"); }; }; }
