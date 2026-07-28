@@ -1024,7 +1024,7 @@ function renderNuevo(){
     <div class="page">
       <div class="upload-area" id="uploadArea" tabindex="0">${f.imgPreview?`<img src="${f.imgPreview}" alt="doc" />`:`<div style="font-size:34px">📎</div><div style="color:#ddd;font-size:14px;margin-top:8px;font-weight:700">Sube, arrastra o pega con Ctrl+V tu captura</div><div style="color:#777;font-size:12px;margin-top:6px">Factura, cotización o boleta (foto)</div>`}</div>
       <div style="text-align:center;margin-top:6px"><button type="button" id="btnSubirPdf" class="btn-secondary" style="font-size:13px;padding:8px 14px">📄 O sube un PDF</button></div>
-      <input type="file" id="fileInput" accept="image/*" style="display:none" />
+      <input type="file" id="fileInput" accept="image/*" capture="environment" style="display:none" />
       <input type="file" id="pdfInput" accept="application/pdf" style="display:none" />
       ${f.extracting?`<div class="extracting">⏳ ${f.statusMessage||"Extrayendo datos..."}</div>`:""}
       ${f.extractSuccess?`<div class="extract-ok">${f.extractSuccess}</div>`:""}
