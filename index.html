@@ -217,6 +217,7 @@ const emptyForm=()=>({
   nDoc:"",
   bultos:"",
   tracking:"",
+  telefono:"",
   productos:[],
   tipoCompra:"importacion",
   empresaNacional:"",
@@ -275,7 +276,12 @@ function showToast(msg){
     if(t) t.remove();
   },2600);
 }
-
+function copyField(text,label){
+  if(!text){ showToast("No hay "+label+" para copiar"); return; }
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(()=>showToast(`${label} copiado`)).catch(()=>showToast("No se pudo copiar"));
+  } else { showToast("No se pudo copiar"); }
+}
 function normalizeText(v){
   return String(v||"")
     .toLowerCase()
@@ -374,7 +380,20 @@ function inferRut(text,lines){
   }
   return rut;
 }
-
+function inferTelefono(text,lines){
+  for(let i=0;i<lines.length;i++){
+    const l=lines[i].toUpperCase();
+    if(/\bFONO\b|\bTELEFONO\b|\bTEL[ÉE]FONO\b|\bCELULAR\b|\bCONTACTO\b/.test(l)){
+      const m=lines[i].match(/(\+?56)?\s?9?\s?[0-9][0-9\s.-]{6,14}[0-9]/);
+      if(m) return m[0].replace(/[^\d+]/g,"");
+    }
+  }
+  const m2=text.match(/\+?56\s?9\s?\d{4}\s?\d{4}/);
+  if(m2) return m2[0].replace(/[^\d+]/g,"");
+  const m3=text.match(/\b9\d{8}\b/);
+  if(m3) return m3[0];
+  return "";
+}
 function inferDocNumber(text){
   const patterns=[
     /(cotizaci[oó]n|cotizacion)[^\d]{0,12}(\d{3,12})/i,
@@ -813,11 +832,12 @@ async function handleFile(file){
     try{
       const text=await ocrImage(file,"spa");
       const lines=text.split("\n").map(l=>l.trim()).filter(Boolean);
-      const nombre=inferNombre(lines,text), rut=inferRut(text,lines), nDoc=inferDocNumber(text);
+      const nombre=inferNombre(lines,text), rut=inferRut(text,lines), nDoc=inferDocNumber(text), telefono=inferTelefono(text,lines);
       const productosDetectados=extractProductCodes(text);
       if(nombre) state.form.nombre=nombre;
       if(rut) state.form.rut=rut;
       if(nDoc) state.form.nDoc=nDoc;
+      if(telefono) state.form.telefono=telefono;
       if(productosDetectados.length) state.form.productos=productosDetectados;
       state.form.extracting=false; state.form.statusMessage="";
       if(nombre || rut || nDoc){
@@ -855,7 +875,7 @@ async function guardar(){
   const existe=state.despachos.find(d=>d.id===f.id);
   const emailActual=(window._auth && window._auth.currentUser && window._auth.currentUser.email) || "";
   const base={
-    id:existe?f.id:Date.now(), fbKey:existe?(f.fbKey||existe.fbKey||""):(f.fbKey||""), ts:Date.now(), nombre:sanitizeName(f.nombre.trim()), rut:f.rut.trim(), nDoc:(f.nDoc||"").trim(), bultos:f.bultos||"", tracking:(f.tracking||"").trim(), productos:Array.isArray(f.productos)?f.productos.filter(p=>p.codigo||p.descripcion):[], docImg:docImgUrl, tipoCompra:f.tipoCompra, empresaNacional:f.empresaNacional, empresaNacionalCustom:(f.empresaNacionalCustom||"").trim(), destino:f.destino, agencia:f.agencia, agenciaCustom:(f.agenciaCustom||"").trim(), direccionDestino:(f.direccionDestino||"").trim(), region:f.region||"", notas:(f.notas||"").trim(), ticketImgs:Array.isArray(f.ticketImgs)?f.ticketImgs:(f.ticketImg?[f.ticketImg]:[]), ticketImg:(Array.isArray(f.ticketImgs)?f.ticketImgs[0]:f.ticketImg)||"", estado:existe?(f.estado||existe.estado||"pendiente"):"pendiente", fecha:existe?(f.fecha||existe.fecha):new Date().toLocaleDateString("es-CL"), creadoPor:existe?(existe.creadoPor||""):emailActual, editadoPor:existe?emailActual:"", historial:existe?addHistory(existe,"Despacho editado",`Se actualizaron datos del despacho${emailActual?" · "+nombreDeUsuario(emailActual):""}`):addHistory({historial:[]},"Despacho creado",`Creación inicial${emailActual?" · "+nombreDeUsuario(emailActual):""}`)
+    id:existe?f.id:Date.now(), fbKey:existe?(f.fbKey||existe.fbKey||""):(f.fbKey||""), ts:Date.now(), nombre:sanitizeName(f.nombre.trim()), rut:f.rut.trim(), nDoc:(f.nDoc||"").trim(), telefono:(f.telefono||"").trim(), bultos:f.bultos||"", tracking:(f.tracking||"").trim(), productos:Array.isArray(f.productos)?f.productos.filter(p=>p.codigo||p.descripcion):[], docImg:docImgUrl, tipoCompra:f.tipoCompra, empresaNacional:f.empresaNacional, empresaNacionalCustom:(f.empresaNacionalCustom||"").trim(), destino:f.destino, agencia:f.agencia, agenciaCustom:(f.agenciaCustom||"").trim(), direccionDestino:(f.direccionDestino||"").trim(), region:f.region||"", notas:(f.notas||"").trim(), ticketImgs:Array.isArray(f.ticketImgs)?f.ticketImgs:(f.ticketImg?[f.ticketImg]:[]), ticketImg:(Array.isArray(f.ticketImgs)?f.ticketImgs[0]:f.ticketImg)||"", estado:existe?(f.estado||existe.estado||"pendiente"):"pendiente", fecha:existe?(f.fecha||existe.fecha):new Date().toLocaleDateString("es-CL"), creadoPor:existe?(existe.creadoPor||""):emailActual, editadoPor:existe?emailActual:"", historial:existe?addHistory(existe,"Despacho editado",`Se actualizaron datos del despacho${emailActual?" · "+nombreDeUsuario(emailActual):""}`):addHistory({historial:[]},"Despacho creado",`Creación inicial${emailActual?" · "+nombreDeUsuario(emailActual):""}`)
   };
   if(existe){ dbActualizar(base); showToast("Despacho editado"); } else { dbGuardar(base); showToast("Despacho guardado"); }
   setState({view:"lista",form:emptyForm()});
@@ -1060,6 +1080,7 @@ function renderNuevo(){
           <button type="button" class="btn-delete prod-remove" data-idx="${idx}" style="flex-shrink:0">🗑</button>
         </div>`).join("")}</div>
       <button type="button" id="btnAgregarProducto" class="btn-secondary" style="margin-bottom:14px">➕ Agregar producto</button>
+      <div class="field"><label>Teléfono</label><input id="fTelefono" value="${f.telefono||""}" placeholder="Ej: +56 9 1234 5678" /></div>
       <div class="section-sep">Tipo de compra</div>
       <div class="tabs"><div class="tab ${!isNacional?"active":""}" id="tabImport">🌏 Importación</div><div class="tab ${isNacional?"active":""}" id="tabNacional">🇨🇱 Compra nacional</div></div>
       ${isNacional?`<div class="field"><label>Empresa proveedora</label><select id="fEmpresaNacional"><option value="">Seleccionar empresa...</option>${EMPRESAS_NACIONAL.map(e=>`<option ${f.empresaNacional===e?"selected":""}>${e}</option>`).join("")}</select></div>${showEmpresaCustom?`<div class="field"><label>¿Cuál empresa?</label><input id="fEmpresaCustom" value="${f.empresaNacionalCustom||""}" placeholder="Nombre de la empresa" /></div>`:""}`:""}
@@ -1089,6 +1110,7 @@ function bindNuevo(){
   document.getElementById("fNombre").oninput=e=>{state.form.nombre=e.target.value;};
   document.getElementById("fRut").oninput=e=>{state.form.rut=e.target.value;};
   document.getElementById("fNDoc").oninput=e=>{state.form.nDoc=e.target.value;};
+  const fTel=document.getElementById("fTelefono"); if(fTel) fTel.oninput=e=>{state.form.telefono=e.target.value;};
   document.getElementById("fBultos").oninput=e=>{state.form.bultos=e.target.value;};
   document.getElementById("fTracking").oninput=e=>{state.form.tracking=e.target.value;};
   document.getElementById("tabImport").onclick=()=>{state.form.tipoCompra="importacion";re();};
@@ -1121,11 +1143,19 @@ function renderDetalle(){
     <div class="header"><button class="btn-back" id="btnBack">←</button><span style="font-weight:700;font-size:16px">Detalle</span><button class="btn-delete" id="btnDelete">🗑</button></div>
     <div class="page">
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"><button class="btn-primary" id="btnEditar">✏️ Editar</button><button class="btn-secondary" id="btnShareOnlyText">💬 Texto</button></div>
-      <div style="background:#1a1a1a;border-radius:16px;padding:20px;margin-bottom:16px;border:1px solid #2a2a2a"><div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;gap:8px"><div><div style="font-size:18px;font-weight:800">${d.nombre}</div>${d.rut?`<div style="color:#888;font-size:13px">RUT: ${d.rut}</div>`:""}</div>${badge(d.estado)}</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">${d.nDoc?`<span class="pill">📄 N° ${d.nDoc}</span>`:""}${d.tracking?`<span class="pill">🚚 ${d.tracking}</span>`:""}${ticketImgs.length?`<span class="pill">🧾 ${ticketImgs.length} ticket${ticketImgs.length>1?"s":""}</span>`:`<span class="pill">🧾 Sin ticket</span>`}</div><div class="row"><span class="lbl">Tipo</span><span class="val">${d.tipoCompra==="importacion"?"🌏 Importación":"🇨🇱 Compra nacional"}</span></div>${empresaLabel?`<div class="row"><span class="lbl">Empresa</span><span class="val">${empresaLabel}</span></div>`:""}<div class="row"><span class="lbl">Destino</span><span class="val">${destinoLabel}</span></div>${agenciaLabel?`<div class="row"><span class="lbl">Agencia</span><span class="val">${agenciaLabel}</span></div>`:""}${d.direccionDestino?`<div class="row"><span class="lbl">Dirección</span><span class="val">${d.direccionDestino}</span></div>`:""}${d.region?`<div class="row"><span class="lbl">Región</span><span class="val">${d.region}</span></div>`:""}${d.bultos?`<div class="row"><span class="lbl">Bultos</span><span class="val">${d.bultos}</span></div>`:""}${d.notas?`<div class="row"><span class="lbl">Notas</span><span class="val">${d.notas}</span></div>`:""}<div class="row"><span class="lbl">Ingresado</span><span class="val">${d.fecha||""}</span></div></div>
+      <div style="background:#1a1a1a;border-radius:16px;padding:20px;margin-bottom:16px;border:1px solid #2a2a2a"><div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;gap:8px"><div><div style="font-size:18px;font-weight:800">${d.nombre}</div>${d.rut?`<div style="color:#888;font-size:13px">RUT: ${d.rut}</div>`:""}</div>${badge(d.estado)}</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">${d.nDoc?`<span class="pill">📄 N° ${d.nDoc}</span>`:""}${d.tracking?`<span class="pill">🚚 ${d.tracking}</span>`:""}${ticketImgs.length?`<span class="pill">🧾 ${ticketImgs.length} ticket${ticketImgs.length>1?"s":""}</span>`:`<span class="pill">🧾 Sin ticket</span>`}</div><div class="row"><span class="lbl">Tipo</span><span class="val">${d.tipoCompra==="importacion"?"🌏 Importación":"🇨🇱 Compra nacional"}</span></div>${empresaLabel?`<div class="row"><span class="lbl">Empresa</span><span class="val">${empresaLabel}</span></div>`:""}<div class="row"><span class="lbl">Destino</span><span class="val">${destinoLabel}</span></div>${agenciaLabel?`<div class="row"><span class="lbl">Agencia</span><span class="val">${agenciaLabel}</span></div>`:""}${d.direccionDestino?`<div class="row"><span class="lbl">Dirección</span><span class="val">${d.direccionDestino}</span></div>`:""}${d.region?`<div class="row"><span class="lbl">Región</span><span class="val">${d.region}</span></div>`:""}${d.bultos?`<div class="row"><span class="lbl">Bultos</span><span class="val">${d.bultos}</span></div>`:""}${d.telefono?`<div class="row"><span class="lbl">Teléfono</span><span class="val">${d.telefono}</span></div>`:""}${d.notas?`<div class="row"><span class="lbl">Notas</span><span class="val">${d.notas}</span></div>`:""}<div class="row"><span class="lbl">Ingresado</span><span class="val">${d.fecha||""}</span></div></div>
       <div style="font-size:13px;color:#aaa;font-weight:700;margin:16px 0 10px">DOCUMENTO ORIGINAL</div>
       ${docImg?`<div class="gallery"><div class="thumb" data-doc-open="1"><img src="${docImg}" alt="Documento" /><div class="thumb-label">Documento</div></div></div>`:cargandoImgs?`<div style="color:#777;font-size:13px;margin-bottom:16px">⏳ Cargando foto...</div>`:`<div style="color:#555;font-size:13px;margin-bottom:16px">Sin documento adjunto.</div>`}
       ${(Array.isArray(d.productos)&&d.productos.length)?`<div style="font-size:13px;color:#aaa;font-weight:700;margin:16px 0 10px">⚠️ PRODUCTOS (VERIFICA EL CÓDIGO)</div><div style="margin-bottom:16px">${d.productos.map(p=>`<div style="background:#1a1a1a;border:1px solid #3b2400;border-radius:12px;padding:10px 14px;margin-bottom:8px"><div style="font-size:16px;font-weight:900;color:#ff8c00;letter-spacing:.5px">${p.codigo||"(sin código)"}</div>${p.descripcion?`<div style="font-size:12px;color:#bbb;margin-top:2px">${p.descripcion}</div>`:""}</div>`).join("")}</div>`:""}
      
+      <div style="font-size:13px;color:#aaa;font-weight:700;margin:16px 0 10px">📋 COPIAR PARA ETIQUETA</div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
+        <button type="button" class="btn-secondary btn-copy" data-copy="${(d.nombre||"").replace(/"/g,"&quot;")}" data-label="Nombre" style="text-align:left">📋 Nombre: <b>${d.nombre||"-"}</b></button>
+        <button type="button" class="btn-secondary btn-copy" data-copy="${(d.rut||"").replace(/"/g,"&quot;")}" data-label="RUT" style="text-align:left">📋 RUT: <b>${d.rut||"-"}</b></button>
+        <button type="button" class="btn-secondary btn-copy" data-copy="${(d.telefono||"").replace(/"/g,"&quot;")}" data-label="Teléfono" style="text-align:left">📋 Teléfono: <b>${d.telefono||"-"}</b></button>
+        <button type="button" class="btn-secondary btn-copy" data-copy="${(getAgencyLabel(d)||"").replace(/"/g,"&quot;")}" data-label="Transporte" style="text-align:left">📋 Transporte: <b>${getAgencyLabel(d)||"-"}</b></button>
+        <button type="button" class="btn-secondary btn-copy" data-copy="${(d.direccionDestino||"").replace(/"/g,"&quot;")}" data-label="Destino" style="text-align:left">📋 Destino: <b>${d.direccionDestino||"-"}</b></button>
+      </div>
       <div style="font-size:13px;color:#aaa;font-weight:700;margin:16px 0 10px">CAMBIAR ESTADO</div>
       ${Object.entries(ESTADOS).map(([k,v])=>`<button class="btn-estado" data-estado="${k}" data-fbkey="${d.fbKey||""}" style="color:${v.color};border-color:${d.estado===k?v.color:"#333"};background:${d.estado===k?v.bg:"#1a1a1a"}">${d.estado===k?"✓ ":""}${v.label}</button>`).join("")}
       <div style="font-size:13px;color:#aaa;font-weight:700;margin:18px 0 10px">TRACKING</div>
@@ -1151,6 +1181,7 @@ function bindDetalle(){
   const d=state.despachos.find(x=>x.id===state.selectedId); if(!d) return;
   const imgs=getImgsFor(d); const docImg=imgs.docImg; const ticketImgs=imgs.ticketImgs;
   document.getElementById("btnBack").onclick=()=>setState({view:"lista"});
+  document.querySelectorAll(".btn-copy").forEach(btn=>{ btn.onclick=()=>copyField(btn.dataset.copy, btn.dataset.label); });
   document.getElementById("btnDelete").onclick=()=>{ if(confirm("¿Eliminar este despacho?")) dbEliminar(state.selectedId,d?.fbKey); };
   document.getElementById("btnEditar").onclick=async()=>{
     const btn=document.getElementById("btnEditar"); const original=btn.textContent;
