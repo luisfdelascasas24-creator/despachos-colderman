@@ -656,7 +656,6 @@ function dbActualizar(d){
   } else {
     const completo=tieneCambioImg?{...payload,docImg,ticketImgs,ticketImg:ticketImgs[0]||""}:{...payload,docImg:existe.docImg,ticketImgs:existe.ticketImgs,ticketImg:existe.ticketImg};
     state.despachos=state.despachos.map(x=>x.id===d.id?completo:x); saveLocal(); render();
-  }
 }
 }
 function dbEstado(id,fbKey,estado){ const d=state.despachos.find(x=>x.id===id); if(!d) return; const emailActual=(window._auth && window._auth.currentUser && window._auth.currentUser.email) || ""; dbActualizar({...d,estado,editadoPor:emailActual,historial:addHistory(d,"Estado cambiado",`${estado}${emailActual?" · "+nombreDeUsuario(emailActual):""}`)}); showToast("Estado actualizado"); }
