@@ -217,6 +217,7 @@ const emptyForm=()=>({
   nDoc:"",
   bultos:"",
   tracking:"",
+  productos:[],
   tipoCompra:"importacion",
   empresaNacional:"",
   empresaNacionalCustom:"",
@@ -386,6 +387,22 @@ function inferDocNumber(text){
     if(m) return m[2];
   }
   return "";
+}
+  function extractProductCodes(text){
+  const lines=text.split("\n").map(l=>l.trim()).filter(Boolean);
+  const codeRe=/\b[A-Z]{3,4}-?\d{3,5}\b/g;
+  const found=[];
+  const seen=new Set();
+  for(const line of lines){
+    const matches=[...line.matchAll(codeRe)];
+    for(const m of matches){
+      const codigo=m[0].toUpperCase();
+      if(seen.has(codigo)) continue;
+      seen.add(codigo);
+      found.push({codigo, descripcion:line});
+    }
+  }
+  return found;
 }
 
 function cleanDigits(v){ return String(v||"").replace(/[^\d]/g,""); }
@@ -796,9 +813,11 @@ async function handleFile(file){
       const text=await ocrImage(file,"spa");
       const lines=text.split("\n").map(l=>l.trim()).filter(Boolean);
       const nombre=inferNombre(lines,text), rut=inferRut(text,lines), nDoc=inferDocNumber(text);
+      const productosDetectados=extractProductCodes(text);
       if(nombre) state.form.nombre=nombre;
       if(rut) state.form.rut=rut;
       if(nDoc) state.form.nDoc=nDoc;
+      if(productosDetectados.length) state.form.productos=productosDetectados;
       state.form.extracting=false; state.form.statusMessage="";
       if(nombre || rut || nDoc){
         const found=[nombre?"nombre":"",rut?"RUT":"",nDoc?"N° documento":""].filter(Boolean).join(", ");
@@ -835,7 +854,7 @@ async function guardar(){
   const existe=state.despachos.find(d=>d.id===f.id);
   const emailActual=(window._auth && window._auth.currentUser && window._auth.currentUser.email) || "";
   const base={
-    id:existe?f.id:Date.now(), fbKey:existe?(f.fbKey||existe.fbKey||""):(f.fbKey||""), ts:Date.now(), nombre:sanitizeName(f.nombre.trim()), rut:f.rut.trim(), nDoc:(f.nDoc||"").trim(), bultos:f.bultos||"", tracking:(f.tracking||"").trim(), docImg:docImgUrl, tipoCompra:f.tipoCompra, empresaNacional:f.empresaNacional, empresaNacionalCustom:(f.empresaNacionalCustom||"").trim(), destino:f.destino, agencia:f.agencia, agenciaCustom:(f.agenciaCustom||"").trim(), direccionDestino:(f.direccionDestino||"").trim(), region:f.region||"", notas:(f.notas||"").trim(), ticketImgs:Array.isArray(f.ticketImgs)?f.ticketImgs:(f.ticketImg?[f.ticketImg]:[]), ticketImg:(Array.isArray(f.ticketImgs)?f.ticketImgs[0]:f.ticketImg)||"", estado:existe?(f.estado||existe.estado||"pendiente"):"pendiente", fecha:existe?(f.fecha||existe.fecha):new Date().toLocaleDateString("es-CL"), creadoPor:existe?(existe.creadoPor||""):emailActual, editadoPor:existe?emailActual:"", historial:existe?addHistory(existe,"Despacho editado",`Se actualizaron datos del despacho${emailActual?" · "+nombreDeUsuario(emailActual):""}`):addHistory({historial:[]},"Despacho creado",`Creación inicial${emailActual?" · "+nombreDeUsuario(emailActual):""}`)
+    id:existe?f.id:Date.now(), fbKey:existe?(f.fbKey||existe.fbKey||""):(f.fbKey||""), ts:Date.now(), nombre:sanitizeName(f.nombre.trim()), rut:f.rut.trim(), nDoc:(f.nDoc||"").trim(), bultos:f.bultos||"", tracking:(f.tracking||"").trim(), productos:Array.isArray(f.productos)?f.productos.filter(p=>p.codigo||p.descripcion):[], docImg:docImgUrl, tipoCompra:f.tipoCompra, empresaNacional:f.empresaNacional, empresaNacionalCustom:(f.empresaNacionalCustom||"").trim(), destino:f.destino, agencia:f.agencia, agenciaCustom:(f.agenciaCustom||"").trim(), direccionDestino:(f.direccionDestino||"").trim(), region:f.region||"", notas:(f.notas||"").trim(), ticketImgs:Array.isArray(f.ticketImgs)?f.ticketImgs:(f.ticketImg?[f.ticketImg]:[]), ticketImg:(Array.isArray(f.ticketImgs)?f.ticketImgs[0]:f.ticketImg)||"", estado:existe?(f.estado||existe.estado||"pendiente"):"pendiente", fecha:existe?(f.fecha||existe.fecha):new Date().toLocaleDateString("es-CL"), creadoPor:existe?(existe.creadoPor||""):emailActual, editadoPor:existe?emailActual:"", historial:existe?addHistory(existe,"Despacho editado",`Se actualizaron datos del despacho${emailActual?" · "+nombreDeUsuario(emailActual):""}`):addHistory({historial:[]},"Despacho creado",`Creación inicial${emailActual?" · "+nombreDeUsuario(emailActual):""}`)
   };
   if(existe){ dbActualizar(base); showToast("Despacho editado"); } else { dbGuardar(base); showToast("Despacho guardado"); }
   setState({view:"lista",form:emptyForm()});
@@ -1032,6 +1051,14 @@ function renderNuevo(){
       <div class="field"><label>Nombre del cliente / empresa *</label><input id="fNombre" value="${f.nombre||""}" placeholder="Extraído o escribe aquí" /></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div class="field"><label>RUT</label><input id="fRut" value="${f.rut||""}" placeholder="Ej: 12.345.678-9" /></div><div class="field"><label>N° Cotización / Factura / Boleta</label><input id="fNDoc" value="${f.nDoc||""}" placeholder="Ej: 5065" /></div></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div class="field"><label>Cantidad de bultos</label><input id="fBultos" type="number" min="1" value="${f.bultos||""}" placeholder="Ej: 3" /></div><div class="field"><label>Tracking</label><input id="fTracking" value="${f.tracking||""}" placeholder="Opcional / si ya lo tienes" /></div></div>
+      <div class="section-sep">⚠️ Productos (verifica el código con cuidado)</div>
+      <div id="productosList">${(f.productos||[]).map((p,idx)=>`
+        <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center" data-prod-row="${idx}">
+          <input class="prod-codigo" data-idx="${idx}" value="${p.codigo||""}" placeholder="Código (ej: CMP-7958)" style="width:160px;font-weight:800;color:#ff8c00" />
+          <input class="prod-desc" data-idx="${idx}" value="${p.descripcion||""}" placeholder="Descripción" style="flex:1" />
+          <button type="button" class="btn-delete prod-remove" data-idx="${idx}" style="flex-shrink:0">🗑</button>
+        </div>`).join("")}</div>
+      <button type="button" id="btnAgregarProducto" class="btn-secondary" style="margin-bottom:14px">➕ Agregar producto</button>
       <div class="section-sep">Tipo de compra</div>
       <div class="tabs"><div class="tab ${!isNacional?"active":""}" id="tabImport">🌏 Importación</div><div class="tab ${isNacional?"active":""}" id="tabNacional">🇨🇱 Compra nacional</div></div>
       ${isNacional?`<div class="field"><label>Empresa proveedora</label><select id="fEmpresaNacional"><option value="">Seleccionar empresa...</option>${EMPRESAS_NACIONAL.map(e=>`<option ${f.empresaNacional===e?"selected":""}>${e}</option>`).join("")}</select></div>${showEmpresaCustom?`<div class="field"><label>¿Cuál empresa?</label><input id="fEmpresaCustom" value="${f.empresaNacionalCustom||""}" placeholder="Nombre de la empresa" /></div>`:""}`:""}
@@ -1074,6 +1101,10 @@ function bindNuevo(){
   const fac=document.getElementById("fAgenciaCustom"); if(fac) fac.oninput=e=>{state.form.agenciaCustom=e.target.value;};
   const fd=document.getElementById("fDireccion"); if(fd) fd.oninput=e=>{state.form.direccionDestino=e.target.value;};
   const fno=document.getElementById("fNotas"); if(fno) fno.oninput=e=>{state.form.notas=e.target.value;};
+  document.querySelectorAll(".prod-codigo").forEach(inp=>{ inp.oninput=e=>{ const idx=+inp.dataset.idx; state.form.productos[idx]=state.form.productos[idx]||{}; state.form.productos[idx].codigo=e.target.value; }; });
+  document.querySelectorAll(".prod-desc").forEach(inp=>{ inp.oninput=e=>{ const idx=+inp.dataset.idx; state.form.productos[idx]=state.form.productos[idx]||{}; state.form.productos[idx].descripcion=e.target.value; }; });
+  document.querySelectorAll(".prod-remove").forEach(btn=>{ btn.onclick=()=>{ const idx=+btn.dataset.idx; state.form.productos.splice(idx,1); re(); }; });
+  const btnAgregarProducto=document.getElementById("btnAgregarProducto"); if(btnAgregarProducto) btnAgregarProducto.onclick=()=>{ state.form.productos=[...(state.form.productos||[]),{codigo:"",descripcion:""}]; re(); };
   document.getElementById("btnGuardar").onclick=guardar;
 }
 
@@ -1092,6 +1123,8 @@ function renderDetalle(){
       <div style="background:#1a1a1a;border-radius:16px;padding:20px;margin-bottom:16px;border:1px solid #2a2a2a"><div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;gap:8px"><div><div style="font-size:18px;font-weight:800">${d.nombre}</div>${d.rut?`<div style="color:#888;font-size:13px">RUT: ${d.rut}</div>`:""}</div>${badge(d.estado)}</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">${d.nDoc?`<span class="pill">📄 N° ${d.nDoc}</span>`:""}${d.tracking?`<span class="pill">🚚 ${d.tracking}</span>`:""}${ticketImgs.length?`<span class="pill">🧾 ${ticketImgs.length} ticket${ticketImgs.length>1?"s":""}</span>`:`<span class="pill">🧾 Sin ticket</span>`}</div><div class="row"><span class="lbl">Tipo</span><span class="val">${d.tipoCompra==="importacion"?"🌏 Importación":"🇨🇱 Compra nacional"}</span></div>${empresaLabel?`<div class="row"><span class="lbl">Empresa</span><span class="val">${empresaLabel}</span></div>`:""}<div class="row"><span class="lbl">Destino</span><span class="val">${destinoLabel}</span></div>${agenciaLabel?`<div class="row"><span class="lbl">Agencia</span><span class="val">${agenciaLabel}</span></div>`:""}${d.direccionDestino?`<div class="row"><span class="lbl">Dirección</span><span class="val">${d.direccionDestino}</span></div>`:""}${d.region?`<div class="row"><span class="lbl">Región</span><span class="val">${d.region}</span></div>`:""}${d.bultos?`<div class="row"><span class="lbl">Bultos</span><span class="val">${d.bultos}</span></div>`:""}${d.notas?`<div class="row"><span class="lbl">Notas</span><span class="val">${d.notas}</span></div>`:""}<div class="row"><span class="lbl">Ingresado</span><span class="val">${d.fecha||""}</span></div></div>
       <div style="font-size:13px;color:#aaa;font-weight:700;margin:16px 0 10px">DOCUMENTO ORIGINAL</div>
       ${docImg?`<div class="gallery"><div class="thumb" data-doc-open="1"><img src="${docImg}" alt="Documento" /><div class="thumb-label">Documento</div></div></div>`:cargandoImgs?`<div style="color:#777;font-size:13px;margin-bottom:16px">⏳ Cargando foto...</div>`:`<div style="color:#555;font-size:13px;margin-bottom:16px">Sin documento adjunto.</div>`}
+      ${(Array.isArray(d.productos)&&d.productos.length)?`<div style="font-size:13px;color:#aaa;font-weight:700;margin:16px 0 10px">⚠️ PRODUCTOS (VERIFICA EL CÓDIGO)</div><div style="margin-bottom:16px">${d.productos.map(p=>`<div style="background:#1a1a1a;border:1px solid #3b2400;border-radius:12px;padding:10px 14px;margin-bottom:8px"><div style="font-size:16px;font-weight:900;color:#ff8c00;letter-spacing:.5px">${p.codigo||"(sin código)"}</div>${p.descripcion?`<div style="font-size:12px;color:#bbb;margin-top:2px">${p.descripcion}</div>`:""}</div>`).join("")}</div>`:""}
+      ${(Array.isArray(d.productos)&&d.productos.length)?`<div style="font-size:13px;color:#aaa;font-weight:700;margin:16px 0 10px">⚠️ PRODUCTOS (VERIFICA EL CÓDIGO)</div><div style="margin-bottom:16px">${d.productos.map(p=>`<div style="background:#1a1a1a;border:1px solid #3b2400;border-radius:12px;padding:10px 14px;margin-bottom:8px"><div style="font-size:16px;font-weight:900;color:#ff8c00;letter-spacing:.5px">${p.codigo||"(sin código)"}</div>${p.descripcion?`<div style="font-size:12px;color:#bbb;margin-top:2px">${p.descripcion}</div>`:""}</div>`).join("")}</div>`:""}
       <div style="font-size:13px;color:#aaa;font-weight:700;margin:16px 0 10px">CAMBIAR ESTADO</div>
       ${Object.entries(ESTADOS).map(([k,v])=>`<button class="btn-estado" data-estado="${k}" data-fbkey="${d.fbKey||""}" style="color:${v.color};border-color:${d.estado===k?v.color:"#333"};background:${d.estado===k?v.bg:"#1a1a1a"}">${d.estado===k?"✓ ":""}${v.label}</button>`).join("")}
       <div style="font-size:13px;color:#aaa;font-weight:700;margin:18px 0 10px">TRACKING</div>
