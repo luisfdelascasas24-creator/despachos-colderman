@@ -639,11 +639,12 @@ function dbGuardar(d){
 }
 function dbActualizar(d){
   const existe=state.despachos.find(x=>x.id===d.id)||{};
+  const cache=(state.imgCache && state.imgCache[d.fbKey]) || {};
   const tieneCambioImg=("docImg" in d)||("ticketImgs" in d)||("ticketImg" in d);
   let ticketCount=existe.ticketCount, hasDoc=existe.hasDoc, docImg, ticketImgs;
   if(tieneCambioImg){
-    ticketImgs=Array.isArray(d.ticketImgs)?d.ticketImgs:(d.ticketImg?[d.ticketImg]:[]);
-    docImg=d.docImg||"";
+    ticketImgs=("ticketImgs" in d)||("ticketImg" in d) ? (Array.isArray(d.ticketImgs)?d.ticketImgs:(d.ticketImg?[d.ticketImg]:[])) : (Array.isArray(cache.ticketImgs)?cache.ticketImgs:[]);
+    docImg=("docImg" in d) ? (d.docImg||"") : (cache.docImg||"");
     ticketCount=ticketImgs.length; hasDoc=!!docImg;
   }
   const payload={...d,ticketCount,hasDoc};
@@ -656,6 +657,7 @@ function dbActualizar(d){
     const completo=tieneCambioImg?{...payload,docImg,ticketImgs,ticketImg:ticketImgs[0]||""}:{...payload,docImg:existe.docImg,ticketImgs:existe.ticketImgs,ticketImg:existe.ticketImg};
     state.despachos=state.despachos.map(x=>x.id===d.id?completo:x); saveLocal(); render();
   }
+}
 }
 function dbEstado(id,fbKey,estado){ const d=state.despachos.find(x=>x.id===id); if(!d) return; const emailActual=(window._auth && window._auth.currentUser && window._auth.currentUser.email) || ""; dbActualizar({...d,estado,editadoPor:emailActual,historial:addHistory(d,"Estado cambiado",`${estado}${emailActual?" · "+nombreDeUsuario(emailActual):""}`)}); showToast("Estado actualizado"); }
 function dbEliminar(id,fbKey){ if(state.useFirebase && fbKey){ window._db.ref("despachos/"+fbKey).remove(); window._db.ref("despachosImgs/"+fbKey).remove(); } else { state.despachos=state.despachos.filter(d=>d.id!==id); saveLocal(); } setState({view:"lista",selectedId:null}); showToast("Despacho eliminado"); }
