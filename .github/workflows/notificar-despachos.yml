@@ -20,7 +20,7 @@ jobs:
       - name: Instalar dependencias
         run: |
           rm -rf node_modules package-lock.json
-          npm install firebase-admin
+          npm install firebase-admin @firebase/app
 
       - name: Revisar y notificar
         run: node scripts/notificar.js
