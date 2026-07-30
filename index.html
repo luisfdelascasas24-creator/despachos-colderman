@@ -370,34 +370,26 @@ function inferRut(text,lines){
   for(let i=0;i<lines.length;i++){
     const l=lines[i].toUpperCase();
     if(/^RUT[:\s]/.test(l)){
-      const m=lines[i].match(/(\d{1,2}(?:\.\d{3}){2}-[\dkK]|\d{7,8}-[\dkK])/);
+      const m=lines[i].match(/(\d{1,2}[.\s]?\d{3}[.\s]?\d{3}-[\dkK]|\d{7,8}-[\dkK])/);
       if(m){ rut=m[1]; break; }
     }
   }
   if(!rut){
-    const m=text.match(/\b(\d{1,2}(?:\.\d{3}){2}-[\dkK]|\d{7,8}-[\dkK])\b/);
+    const m=text.match(/\b(\d{1,2}[.\s]?\d{3}[.\s]?\d{3}-[\dkK]|\d{7,8}-[\dkK])\b/);
     if(m) rut=m[1];
   }
   return rut;
 }
-function inferTelefono(text,lines,rutDetectado){
-  const rutDigits=String(rutDetectado||"").replace(/[^\dkK]/g,"").toUpperCase();
-  const esIgualAlRut=(v)=>{
-    const d=String(v||"").replace(/[^\dkK]/g,"").toUpperCase();
-    return rutDigits && d && (d===rutDigits || rutDigits.includes(d) || d.includes(rutDigits));
-  };
+function inferTelefono(text,lines){
   for(let i=0;i<lines.length;i++){
     const l=lines[i].toUpperCase();
     if(/\bFONO\b|\bTEL[EÉ]FONO\b|\bCELULAR\b|\bWHATSAPP\b/.test(l) && !/\bRUT\b/.test(l)){
-      const m=lines[i].match(/(\+?56)?\s?9\s?[\d\s.-]{7,12}\d/) || lines[i].match(/\b\d{8,9}\b/);
-      if(m){
-        const limpio=m[0].replace(/[^\d+]/g,"");
-        if(!esIgualAlRut(limpio)) return limpio;
-      }
+      const m=lines[i].match(/\+?56\s?9\s?\d{4}\s?\d{4}/);
+      if(m) return m[0].replace(/[^\d+]/g,"");
     }
   }
-  const m2=text.match(/\+?56\s?9\s?\d{4}\s?\d{4}/);
-  if(m2){ const limpio=m2[0].replace(/[^\d+]/g,""); if(!esIgualAlRut(limpio)) return limpio; }
+  const m2=text.match(/\+56\s?9\s?\d{4}\s?\d{4}/);
+  if(m2) return m2[0].replace(/[^\d+]/g,"");
   return "";
 }
 function inferDocNumber(text){
@@ -839,7 +831,7 @@ async function handleFile(file){
       const text=await ocrImage(file,"spa");
       const lines=text.split("\n").map(l=>l.trim()).filter(Boolean);
       const nombre=inferNombre(lines,text), rut=inferRut(text,lines), nDoc=inferDocNumber(text);
-      const telefono=inferTelefono(text,lines,rut);
+      const telefono=inferTelefono(text,lines);
       const productosDetectados=extractProductCodes(text);
       if(nombre) state.form.nombre=nombre;
       if(rut) state.form.rut=rut;
