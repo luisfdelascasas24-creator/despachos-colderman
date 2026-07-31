@@ -381,15 +381,23 @@ function inferRut(text,lines){
   return rut;
 }
 function inferTelefono(text,lines){
+  // Ubicamos dónde empieza el bloque de datos del cliente (SEÑOR(ES)/RUT), para no
+  // confundirnos con el teléfono de Colderman que aparece arriba, en el encabezado.
+  let anchor=-1;
   for(let i=0;i<lines.length;i++){
+    const l=lines[i].toUpperCase();
+    if(/SE[NÑ]OR(?:ES)?|SENOR(?:ES)?|CLIENTE|DESTINATARIO|A NOMBRE|RAZON SOCIAL/.test(l) || /^RUT[:\s]/.test(l)){
+      anchor=i; break;
+    }
+  }
+  if(anchor===-1) return "";
+  for(let i=anchor;i<lines.length;i++){
     const l=lines[i].toUpperCase();
     if(/\bFONO\b|\bTEL[EÉ]FONO\b|\bCELULAR\b|\bWHATSAPP\b/.test(l) && !/\bRUT\b/.test(l)){
       const m=lines[i].match(/\+?56\s?9\s?\d{4}\s?\d{4}/);
       if(m) return m[0].replace(/[^\d+]/g,"");
     }
   }
-  const m2=text.match(/\+56\s?9\s?\d{4}\s?\d{4}/);
-  if(m2) return m2[0].replace(/[^\d+]/g,"");
   return "";
 }
 function inferDocNumber(text){
