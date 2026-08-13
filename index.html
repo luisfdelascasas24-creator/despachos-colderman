@@ -415,7 +415,11 @@ function inferDocNumber(text){
 }
 function extractProductCodes(text){
   const lines=text.split("\n").map(l=>l.trim()).filter(Boolean);
-  const codeRe=/\b[A-Z]{3,4}-?\d{3,5}\b/g;
+  // Los códigos de producto de Colderman siempre llevan guion (ej: CMP-0045, EVA-1234).
+  // El guion es OBLIGATORIO en esta regex para no confundir el código real con nombres
+  // de modelos de vehículos que aparecen en la misma línea (ej: "XUV500"), los cuales
+  // también calzan con el patrón de letras+números pero no son códigos de producto.
+  const codeRe=/\b[A-Z]{2,4}-\d{3,5}\b/g;
   const found=[];
   const seen=new Set();
   for(const line of lines){
