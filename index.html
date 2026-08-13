@@ -1012,7 +1012,7 @@ function renderLista(){
             <input id="searchInput" value="${state.busqueda||""}" placeholder="Buscar cliente, tracking o número de documento..." style="width:100%;background:#111214;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:13px 12px 13px 38px;color:#fff;font-size:14px;outline:none" />
           </div>
           <button class="chip ${state.filtroDia==="hoy"?"active":""}" id="btnHoy">📅 Hoy</button>
-          <input type="date" id="filtroCalendario" value="${state.filtroFecha||""}" style="background:#111214;border:1px solid ${state.filtroFecha?"#e07b00":"rgba(255,255,255,.08)"};border-radius:14px;padding:12px 12px;color:${state.filtroFecha?"#e07b00":"#888"};font-size:14px;outline:none;cursor:pointer" />
+          <input type="date" id="filtroCalendario" min="2026-01-01" value="${state.filtroFecha||""}" style="color-scheme:dark;accent-color:#e07b00;background:#111214;border:1px solid ${state.filtroFecha?"#e07b00":"rgba(255,255,255,.08)"};border-radius:14px;padding:12px 12px;color:${state.filtroFecha?"#e07b00":"#888"};font-size:14px;outline:none;cursor:pointer" />
           ${state.filtroFecha?`<button class="chip" id="btnLimpiarFecha">✕ Limpiar fecha</button>`:""}
           <select id="filtroAgencia" style="min-width:190px;background:#111214;border:1px solid ${state.filtroAgencia?"#e07b00":"rgba(255,255,255,.08)"};border-radius:14px;padding:12px 12px;color:${state.filtroAgencia?"#e07b00":"#888"};font-size:13px;outline:none">
             <option value="">🚚 Agencia...</option>
