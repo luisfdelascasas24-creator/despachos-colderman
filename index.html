@@ -1055,7 +1055,13 @@ function bindLista(){
   Object.keys(ESTADOS).forEach(k=>{ document.getElementById("cnt-"+k).onclick=()=>setState({filtro:state.filtro===k?"todos":k}); });
   document.querySelectorAll(".card[data-id]").forEach(el=>{ el.onclick=(e)=>{ if(e.target.closest(".quick-wa")) return; setState({view:"detalle",selectedId:+el.dataset.id}); }; });
   document.querySelectorAll(".quick-wa").forEach(btn=>{ btn.onclick=(e)=>{ e.stopPropagation(); const d=state.despachos.find(x=>x.id===+btn.dataset.quickwa); if(d) triggerQuickShare(d); }; });
-  document.getElementById("searchInput").oninput=e=>{ state.busqueda=e.target.value; render(); setTimeout(bindLista,0); };
+  document.getElementById("searchInput").oninput=e=>{
+    const cursorPos=e.target.selectionStart;
+    state.busqueda=e.target.value;
+    render();
+    const input=document.getElementById("searchInput");
+    if(input){ input.focus(); input.setSelectionRange(cursorPos,cursorPos); }
+  };
   document.getElementById("btnHoy").onclick=()=>setState({filtroDia:state.filtroDia==="hoy"?"todos":"hoy",filtroFecha:""});
   document.getElementById("filtroCalendario").onchange=e=>setState({filtroFecha:e.target.value,filtroDia:"todos"});
   document.getElementById("filtroAgencia").onchange=e=>setState({filtroAgencia:e.target.value});
