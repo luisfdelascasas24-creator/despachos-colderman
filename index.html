@@ -220,6 +220,32 @@
     @media (max-width:980px){.dashboard-grid{grid-template-columns:repeat(2,1fr)}.layout{flex-direction:column}.layout-side{width:100%}}
     @media (max-width:700px){.list-card-grid{grid-template-columns:1fr}.header{padding:12px 14px}.brand-title{font-size:16px}.header-actions{width:100%;justify-content:flex-end}.btn-main{padding:10px 14px}.dashboard-grid,.counters,.filters-wrap,.layout{padding-left:12px;padding-right:12px}.page{padding:12px}}
     @media (max-width:560px){.header{flex-wrap:wrap;align-items:flex-start}.header-actions{width:100%;display:grid;grid-template-columns:1fr 1fr}.btn-main,.btn-secondary{width:100%}.dashboard-grid{grid-template-columns:1fr 1fr}.counters{grid-template-columns:1fr 1fr 1fr}.search-shell{padding:10px}}
+
+    /* ===== Animaciones épicas ===== */
+    .view-root{animation:viewIn .42s cubic-bezier(.22,.9,.32,1.25) both}
+    @keyframes viewIn{0%{opacity:0;transform:translateY(14px) scale(.985)}100%{opacity:1;transform:translateY(0) scale(1)}}
+    .btn-main,.btn-primary,.btn-secondary,.btn-danger,.btn-ghost,.chip,.counter,.tab,.resumen-item,.dashboard-card{position:relative;overflow:hidden}
+    .ripple-fx{position:absolute;border-radius:50%;background:rgba(255,255,255,.5);transform:scale(0);animation:rippleAnim .6s cubic-bezier(.22,.9,.32,1) forwards;pointer-events:none;mix-blend-mode:overlay}
+    @keyframes rippleAnim{to{transform:scale(2.8);opacity:0}}
+    .btn-main:active,.btn-primary:active{transform:scale(.94)}
+    .btn-main,.btn-primary{transition:transform .18s cubic-bezier(.34,1.56,.64,1),filter .18s ease,box-shadow .18s ease}
+    .btn-main:hover,.btn-primary:hover{transform:translateY(-2px);box-shadow:0 14px 28px rgba(224,123,0,.3)}
+    .counter{transition:transform .22s cubic-bezier(.34,1.56,.64,1),border-color .2s ease,box-shadow .2s ease}
+    .counter:hover{transform:translateY(-3px) scale(1.02);box-shadow:0 14px 26px rgba(0,0,0,.32)}
+    .dashboard-card{transition:transform .22s cubic-bezier(.34,1.56,.64,1),box-shadow .2s ease}
+    .dashboard-card:hover{transform:translateY(-3px);box-shadow:0 14px 26px rgba(0,0,0,.32)}
+    .card{transition:transform .22s cubic-bezier(.34,1.56,.64,1),border-color .18s ease,box-shadow .22s ease}
+    .card:hover{transform:translateY(-3px)}
+    .confetti-piece{position:fixed;top:0;left:0;width:8px;height:8px;border-radius:2px;pointer-events:none;z-index:9998;animation:confettiFall 1.15s cubic-bezier(.25,.46,.45,.94) forwards}
+    @keyframes confettiFall{0%{transform:translate(0,0) rotate(0deg) scale(1);opacity:1}100%{transform:translate(var(--dx),var(--dy)) rotate(var(--rot)) scale(.4);opacity:0}}
+    .estado-flash{animation:estadoFlash .7s ease}
+    @keyframes estadoFlash{0%{box-shadow:0 0 0 0 rgba(16,185,129,.55)}70%{box-shadow:0 0 0 26px rgba(16,185,129,0)}100%{box-shadow:0 0 0 0 rgba(16,185,129,0)}}
+    .btn-estado{transition:transform .18s cubic-bezier(.34,1.56,.64,1),background .18s ease,border-color .18s ease}
+    .btn-estado:hover{transform:translateX(3px)}
+    .toast{animation:toastIn .38s cubic-bezier(.34,1.56,.64,1),toastPulse 1.8s ease-in-out .4s infinite}
+    @keyframes toastPulse{0%,100%{box-shadow:0 10px 30px rgba(0,0,0,.35)}50%{box-shadow:0 10px 34px rgba(224,123,0,.22)}}
+    .btn-back{transition:transform .18s cubic-bezier(.34,1.56,.64,1)}
+    .btn-back:hover{transform:translateX(-3px)}
   </style>
 </head>
 <body>
@@ -303,6 +329,67 @@ function showToast(msg){
     if(t) t.remove();
   },2600);
 }
+// Efecto "ripple" (ondita al tocar) en botones/chips/counters, como apps nativas
+function attachRipples(selector){
+  document.querySelectorAll(selector).forEach(el=>{
+    if(el._rippleBound) return;
+    el._rippleBound=true;
+    el.addEventListener("click",function(e){
+      const rect=el.getBoundingClientRect();
+      const size=Math.max(rect.width,rect.height);
+      const ripple=document.createElement("span");
+      ripple.className="ripple-fx";
+      ripple.style.width=ripple.style.height=size+"px";
+      const x=(e.clientX||rect.left+rect.width/2)-rect.left-size/2;
+      const y=(e.clientY||rect.top+rect.height/2)-rect.top-size/2;
+      ripple.style.left=x+"px"; ripple.style.top=y+"px";
+      el.appendChild(ripple);
+      setTimeout(()=>ripple.remove(),650);
+    });
+  });
+}
+
+// Confeti que explota desde un punto de la pantalla (para celebrar "Entregado")
+function spawnConfetti(x,y){
+  const colors=["#e07b00","#f59e0b","#10b981","#3b82f6","#f43f5e","#ffffff"];
+  const total=26;
+  for(let i=0;i<total;i++){
+    const piece=document.createElement("div");
+    piece.className="confetti-piece";
+    const angle=Math.random()*Math.PI*2;
+    const dist=70+Math.random()*110;
+    piece.style.setProperty("--dx",(Math.cos(angle)*dist)+"px");
+    piece.style.setProperty("--dy",(Math.sin(angle)*dist-50)+"px");
+    piece.style.setProperty("--rot",(Math.random()*360-180)+"deg");
+    piece.style.background=colors[Math.floor(Math.random()*colors.length)];
+    piece.style.left=x+"px"; piece.style.top=y+"px";
+    piece.style.borderRadius=Math.random()>0.5?"50%":"2px";
+    piece.style.animationDelay=(Math.random()*0.06)+"s";
+    document.body.appendChild(piece);
+    setTimeout(()=>piece.remove(),1400);
+  }
+}
+
+// Anima un número contando de 0 hasta el valor final (para el dashboard)
+function animateCount(el,target){
+  const dur=650;
+  const startTime=performance.now();
+  function step(now){
+    const p=Math.min(1,(now-startTime)/dur);
+    const eased=1-Math.pow(1-p,3);
+    el.textContent=Math.round(target*eased);
+    if(p<1) requestAnimationFrame(step);
+    else el.textContent=target;
+  }
+  requestAnimationFrame(step);
+}
+function animateCounters(){
+  document.querySelectorAll("[data-count]").forEach(el=>{
+    const target=parseInt(el.dataset.count,10)||0;
+    animateCount(el,target);
+  });
+}
+
 function copyField(text,label){
   if(!text){ showToast("No hay "+label+" para copiar"); return; }
   if(navigator.clipboard && navigator.clipboard.writeText){
@@ -927,15 +1014,15 @@ async function guardar(){
   const base={
     id:existe?f.id:Date.now(), fbKey:existe?(f.fbKey||existe.fbKey||""):(f.fbKey||""), ts:Date.now(), nombre:sanitizeName(f.nombre.trim()), rut:f.rut.trim(), nDoc:(f.nDoc||"").trim(), telefono:(f.telefono||"").trim(), bultos:f.bultos||"", tracking:(f.tracking||"").trim(), productos:Array.isArray(f.productos)?f.productos.filter(p=>p.codigo||p.descripcion):[], docImg:docImgUrl, tipoCompra:f.tipoCompra, empresaNacional:f.empresaNacional, empresaNacionalCustom:(f.empresaNacionalCustom||"").trim(), destino:f.destino, agencia:f.agencia, agenciaCustom:(f.agenciaCustom||"").trim(), direccionDestino:(f.direccionDestino||"").trim(), region:f.region||"", notas:(f.notas||"").trim(), ticketImgs:Array.isArray(f.ticketImgs)?f.ticketImgs:(f.ticketImg?[f.ticketImg]:[]), ticketImg:(Array.isArray(f.ticketImgs)?f.ticketImgs[0]:f.ticketImg)||"", estado:existe?(f.estado||existe.estado||"pendiente"):"pendiente", fecha:existe?(f.fecha||existe.fecha):new Date().toLocaleDateString("es-CL"), creadoPor:existe?(existe.creadoPor||""):emailActual, editadoPor:existe?emailActual:"", historial:existe?addHistory(existe,"Despacho editado",`Se actualizaron datos del despacho${emailActual?" · "+nombreDeUsuario(emailActual):""}`):addHistory({historial:[]},"Despacho creado",`Creación inicial${emailActual?" · "+nombreDeUsuario(emailActual):""}`)
   };
-  if(existe){ dbActualizar(base); showToast("Despacho editado"); } else { dbGuardar(base); showToast("Despacho guardado"); state._nuevoDestacadoId=base.id; setTimeout(()=>{ if(state._nuevoDestacadoId===base.id){ state._nuevoDestacadoId=null; render(); } },2200); }
+  if(existe){ dbActualizar(base); showToast("Despacho editado"); } else { dbGuardar(base); showToast("Despacho guardado"); spawnConfetti(window.innerWidth/2, 120); state._nuevoDestacadoId=base.id; setTimeout(()=>{ if(state._nuevoDestacadoId===base.id){ state._nuevoDestacadoId=null; render(); } },2200); }
   setState({view:"lista",form:emptyForm()});
 }
 
 function render(){
   const app=document.getElementById("app");
-  if(state.view==="nuevo"){ app.innerHTML=renderNuevo(); bindNuevo(); return; }
-  if(state.view==="detalle"){ app.innerHTML=renderDetalle(); bindDetalle(); return; }
-  app.innerHTML=renderLista(); bindLista();
+  if(state.view==="nuevo"){ app.innerHTML=`<div class="view-root">${renderNuevo()}</div>`; bindNuevo(); attachRipples(".btn-main,.btn-primary,.btn-secondary,.btn-danger,.chip,.tab"); return; }
+  if(state.view==="detalle"){ app.innerHTML=`<div class="view-root">${renderDetalle()}</div>`; bindDetalle(); attachRipples(".btn-main,.btn-primary,.btn-secondary,.btn-danger,.btn-estado"); return; }
+  app.innerHTML=`<div class="view-root">${renderLista()}</div>`; bindLista(); attachRipples(".btn-main,.btn-primary,.btn-secondary,.btn-danger,.chip,.counter,.tab"); animateCounters();
 }
 
 function renderLista(){
@@ -1034,14 +1121,14 @@ function renderLista(){
     ${sinTicket.length>0?`<div class="banner info">🧾 Hay <strong>${sinTicket.length}</strong> despacho${sinTicket.length>1?"s":""} entregado${sinTicket.length>1?"s":""} sin ticket</div>`:""}
 
     <div class="dashboard-grid">
-      <div class="dashboard-card"><div class="dashboard-num">${dash.total}</div><div class="dashboard-lbl">Total</div><div class="dashboard-hint">Todos los despachos</div></div>
-      <div class="dashboard-card"><div class="dashboard-num">${dash.hoy}</div><div class="dashboard-lbl">Ingresados hoy</div><div class="dashboard-hint">Actividad del día</div></div>
-      <div class="dashboard-card"><div class="dashboard-num" style="color:#f59e0b">${dash.atrasados}</div><div class="dashboard-lbl">Pendientes atrasados</div><div class="dashboard-hint">Revisar seguimiento</div></div>
-      <div class="dashboard-card"><div class="dashboard-num" style="color:#10b981">${dash.sinTicket}</div><div class="dashboard-lbl">Entregados sin ticket</div><div class="dashboard-hint">Falta comprobante</div></div>
+      <div class="dashboard-card"><div class="dashboard-num" data-count="${dash.total}">0</div><div class="dashboard-lbl">Total</div><div class="dashboard-hint">Todos los despachos</div></div>
+      <div class="dashboard-card"><div class="dashboard-num" data-count="${dash.hoy}">0</div><div class="dashboard-lbl">Ingresados hoy</div><div class="dashboard-hint">Actividad del día</div></div>
+      <div class="dashboard-card"><div class="dashboard-num" style="color:#f59e0b" data-count="${dash.atrasados}">0</div><div class="dashboard-lbl">Pendientes atrasados</div><div class="dashboard-hint">Revisar seguimiento</div></div>
+      <div class="dashboard-card"><div class="dashboard-num" style="color:#10b981" data-count="${dash.sinTicket}">0</div><div class="dashboard-lbl">Entregados sin ticket</div><div class="dashboard-hint">Falta comprobante</div></div>
     </div>
 
     <div class="counters">
-      ${Object.entries(ESTADOS).map(([k,v])=>`<div class="counter" id="cnt-${k}" style="border-color:${state.filtro===k?v.color:"rgba(255,255,255,.07)"};background:${state.filtro===k?v.bg:"linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.02))"}"><div class="num" style="color:${v.color}">${c[k]}</div><div class="lbl">${v.label}</div></div>`).join("")}
+      ${Object.entries(ESTADOS).map(([k,v])=>`<div class="counter" id="cnt-${k}" style="border-color:${state.filtro===k?v.color:"rgba(255,255,255,.07)"};background:${state.filtro===k?v.bg:"linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.02))"}"><div class="num" style="color:${v.color}" data-count="${c[k]}">0</div><div class="lbl">${v.label}</div></div>`).join("")}
     </div>
 
     <div class="filters-wrap">
@@ -1265,7 +1352,7 @@ function bindDetalle(){
   }
   document.querySelectorAll("[data-doc-open]").forEach(el=>{ el.onclick=()=>openImageOverlay(docImg,`documento-${slugify(d.nombre)}.jpg`); });
   document.querySelectorAll("[data-ticket-open]").forEach(el=>{ const idx=+el.dataset.ticketOpen; el.onclick=()=>openImageOverlay(ticketImgs[idx]); });
-  document.querySelectorAll(".btn-estado").forEach(btn=>{ btn.onclick=()=>{ const nuevoEstado=btn.dataset.estado; if(nuevoEstado==="entregado" && !ticketImgs.length){ const seguir=confirm("Este despacho se marcará como entregado sin ticket. ¿Continuar?"); if(!seguir) return; } dbEstado(state.selectedId,btn.dataset.fbkey,nuevoEstado); }; });
+  document.querySelectorAll(".btn-estado").forEach(btn=>{ btn.onclick=()=>{ const nuevoEstado=btn.dataset.estado; if(nuevoEstado==="entregado" && !ticketImgs.length){ const seguir=confirm("Este despacho se marcará como entregado sin ticket. ¿Continuar?"); if(!seguir) return; } if(nuevoEstado==="entregado"){ const rect=btn.getBoundingClientRect(); spawnConfetti(rect.left+rect.width/2, rect.top+rect.height/2); btn.classList.add("estado-flash"); } dbEstado(state.selectedId,btn.dataset.fbkey,nuevoEstado); }; });
   const btnWa=document.getElementById("btnWhatsapp"); if(btnWa){ btnWa.onclick=async(e)=>{ e.preventDefault(); const mensaje=buildWhatsappMessage(d); try{ if(ticketImgs.length && navigator.share){ const files=[]; for(let i=0;i<ticketImgs.length;i++){ const res=await fetch(ticketImgs[i]); const blob=await res.blob(); files.push(new File([blob],filenameForTicket(d,i),{type:blob.type||"image/jpeg"})); } const shareData={text:mensaje,files}; if(navigator.canShare && !navigator.canShare(shareData)){ throw new Error("share-not-supported"); } await navigator.share(shareData); } else if(navigator.share){ await navigator.share({text:mensaje}); } else { window.open("https://api.whatsapp.com/send?text="+encodeURIComponent(mensaje),"_blank"); } }catch(err){ if(err.name==="AbortError") return; console.error("Error compartiendo",err); try{ if(navigator.clipboard) await navigator.clipboard.writeText(mensaje); }catch(_){} showToast("No se pudo adjuntar la foto automáticamente. Texto copiado — comparte el ticket manualmente."); window.open("https://api.whatsapp.com/send?text="+encodeURIComponent(mensaje),"_blank"); }; }; }
   const btnDesc=document.getElementById("btnDescargarTodo"); if(btnDesc){ btnDesc.onclick=()=>{ if(ticketImgs.length){ const a=document.createElement("a"); a.href=ticketImgs[0]; a.download=filenameForTicket(d,0); a.click(); } else showToast("No hay ticket para descargar"); }; }
   document.getElementById("ticketUpload").onclick=()=>document.getElementById("ticketFileInput").click();
