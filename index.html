@@ -393,16 +393,35 @@ function inferNombre(lines,text){
 }
 
 function inferRut(text,lines){
-  let rut="";
+  // Igual que con el teléfono: ubicamos primero dónde empieza el bloque del cliente,
+  // para no agarrar por error el RUT de Colderman que aparece arriba en el encabezado.
+  let anchor=-1;
   for(let i=0;i<lines.length;i++){
     const l=lines[i].toUpperCase();
-    if(/^RUT[:\s]/.test(l)){
-      const m=lines[i].match(/(\d{1,2}[.\s]?\d{3}[.\s]?\d{3}-[\dkK]|\d{7,8}-[\dkK])/);
+    if(/SE[NÑ]OR(?:ES)?|SENOR(?:ES)?|CLIENTE|DESTINATARIO|A NOMBRE|RAZON SOCIAL/.test(l)){
+      anchor=i; break;
+    }
+  }
+  const zona=anchor===-1?lines:lines.slice(anchor);
+  const rutPattern=/(\d{1,2}[.\s]?\d{3}[.\s]?\d{3}-[\dkK]|\d{7,8}-[\dkK])/;
+  let rut="";
+  for(let i=0;i<zona.length;i++){
+    const l=zona[i].toUpperCase();
+    if(/\bRUT\b/.test(l)){
+      const m=zona[i].match(rutPattern);
       if(m){ rut=m[1]; break; }
     }
   }
   if(!rut){
-    const m=text.match(/\b(\d{1,2}[.\s]?\d{3}[.\s]?\d{3}-[\dkK]|\d{7,8}-[\dkK])\b/);
+    // Si no hay una línea con la palabra RUT, buscamos cualquier RUT dentro de la zona del cliente
+    for(const l of zona){
+      const m=l.match(rutPattern);
+      if(m){ rut=m[1]; break; }
+    }
+  }
+  if(!rut && anchor===-1){
+    // Última opción: si ni siquiera encontramos el bloque del cliente, buscamos en todo el texto
+    const m=text.match(rutPattern);
     if(m) rut=m[1];
   }
   return rut;
