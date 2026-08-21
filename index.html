@@ -348,6 +348,7 @@ function openImageOverlay(src,filename){
 }
 function sanitizeName(v){
   return String(v||"")
+    .replace(/(\p{L})\s+8\s+(\p{L})/gu,"$1 & $2") // corrige el "&" que el OCR a veces lee como "8" suelto entre palabras
     .replace(/\bFECHA\s+EMISI[OÓ]N\b.*$/i,"")
     .replace(/\bFECHA\b.*$/i,"")
     .replace(/\bRUT\b.*$/i,"")
@@ -1094,7 +1095,17 @@ function renderLista(){
     <div class="layout">
       <div class="layout-main">${cards}</div>
       <div class="layout-side">
-        <div class="summary-title">Resumen pendiente</div>
+        <div class="summary-title" style="color:#3b82f6;display:flex;align-items:center;justify-content:space-between">
+          <span>📦 Para despachar (Empacado)</span>
+          ${(()=>{ const n=state.despachos.filter(d=>d.estado==="empacado").length; return n?`<span style="background:#001a33;color:#3b82f6;border-radius:999px;padding:2px 8px;font-size:11px">${n}</span>`:""; })()}
+        </div>
+        ${(()=>{
+          const emp=state.despachos.filter(d=>d.estado==="empacado");
+          const conteo={}; emp.forEach(d=>{ const key=getAgencyLabel(d)||"Sin agencia"; conteo[key]=(conteo[key]||0)+1; });
+          if(Object.keys(conteo).length===0) return `<div class="mini-card" style="font-size:12px;color:#555;text-align:center">Nada empacado todavía</div>`;
+          return Object.entries(conteo).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<div class="resumen-item" data-agencia="${k}" style="background:${state.filtroAgencia===k?"#001a33":"#151518"};border-color:${state.filtroAgencia===k?"#3b82f6":"rgba(255,255,255,.07)"}"><span style="font-size:12px;color:#ccc;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${k}</span><span style="font-size:14px;font-weight:800;color:#3b82f6;margin-left:6px">${v}</span></div>`).join("");
+        })()}
+        <div class="summary-title" style="margin-top:16px">Resumen pendiente</div>
         ${(()=>{
           const pend=state.despachos.filter(d=>d.estado==="pendiente");
           const conteo={}; pend.forEach(d=>{ const key=getAgencyLabel(d)||"Sin agencia"; conteo[key]=(conteo[key]||0)+1; });
