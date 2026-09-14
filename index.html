@@ -29,6 +29,10 @@
     });
   </script>
   <script>
+  // En la APK (Capacitor) inicializamos el SDK nativo de OneSignal, mismo appId
+  document.addEventListener("deviceready",function(){ try{ if(window.plugins&&window.plugins.OneSignal){ window.plugins.OneSignal.initialize("50716c0f-96b3-4963-945b-fb047105e2ee"); } }catch(e){ console.log("OneSignal nativo:",e); } },false);
+  </script>
+  <script>
     const firebaseConfig = {
       apiKey: "AIzaSyAaXhbTngCzxcXdo3i-mfwy_kG2ehNS4sc",
       authDomain: "despachos-colderman.firebaseapp.com",
@@ -227,7 +231,7 @@
 
 <script>
 const REGIONES=["Arica y Parinacota","Tarapacá","Antofagasta","Atacama","Coquimbo","Valparaíso","Región Metropolitana","O'Higgins","Maule","Ñuble","Biobío","La Araucanía","Los Ríos","Los Lagos","Aysén","Magallanes"];
-const AGENCIAS=["Starken","Varmont","PDQ","Chevallier","FedEx","Chilexpress","Bluexpress","RapidCargo","Uber Envíos","Infante","El Arriero","Otra..."];
+const AGENCIAS=["Starken","Varmont","PDQ","Chevalier","FedEx","Chilexpress","Bluexpress","RapidCargo","Uber Envíos","Infante","El Arriero","Otra..."];
 const EMPRESAS_NACIONAL=["Blescom","American Air","Esmeralda","Otra..."];
 const ESTADOS={
   pendiente:{label:"Pendiente",color:"#f59e0b",bg:"#2a1f00"},
@@ -499,49 +503,63 @@ function extractProductCodes(text){
 function cleanDigits(v){ return String(v||"").replace(/[^\d]/g,""); }
 
 function detectTrackingByAgency(text, agency){
-  const raw=String(text||"");
-  const compact=raw.replace(/\s+/g," ").trim();
-  const upper=compact.toUpperCase();
-  const justDigits=(s)=>cleanDigits(s);
-  function matchDigits(re){
-    const m=upper.match(re);
-    return m ? justDigits(m[1]||m[0]) : "";
-  }
+  const upper=String(text||"").replace(/\s+/g," ").trim().toUpperCase();
+  const digits=s=>cleanDigits(s);
+  function matchDigits(re){ const m=upper.match(re); return m?digits(m[1]||m[0]):""; }
+
+  // Filtros: descartan teléfonos, cuerpos de RUT y fechas que no son tracking
+  const isPhoneLike = v => /^(56)?9\d{8}$/.test(v);      // 912345678 / 56912345678
+  const isRutBody   = v => /^\d{7,8}$/.test(v);           // cuerpo del RUT sin DV
+  const isDateLike  = v => /^(19|20)\d{6}$/.test(v);      // 20230915
+  const clean = v => v && !isPhoneLike(v) && !isRutBody(v) && !isDateLike(v);
+  const cands = (re) => [...upper.matchAll(re)].map(x=>x[0]).filter(clean);
+
   const ag=String(agency||"").toLowerCase();
+
   if(ag.includes("starken")){
-    let v=matchDigits(/ORDEN\s+DE\s+FLETE(?:\s+NOMINATIVA)?\s*(?:N\.?|N[°º])?\s*([0-9.,]+)/i); if(v) return v;
-    v=matchDigits(/NUMERO\s+DE\s+ORDEN\s+DE\s+FLETE\s*[:\-]?\s*([0-9.,]+)/i); if(v) return v;
+    let v=matchDigits(/ORDEN\s+DE\s+FLETE(?:\s+NOMINATIVA)?\s*(?:N\.?|N[°º])?\s*([0-9.,\s]{6,14})/i); if(v) return v;
+    v=matchDigits(/NUMERO\s+DE\s+ORDEN\s+DE\s+FLETE\s*[:\-]?\s*([0-9.,\s]{6,14})/i); if(v) return v;
+    // OT Starken: 8-9 dígitos, nunca parte en 9 (eso sería un celular)
+    const cs=cands(/\b\d{8,9}\b/g).filter(x=>!x.startsWith("9"));
+    if(cs.length){ cs.sort((a,b)=>b.length-a.length); return cs[0]; }
   }
-  if(ag.includes("chevallier")){
-    let v=matchDigits(/(?:^|\s)(\d{10,14})(?:\s|$)/); if(v) return v;
+  if(ag.includes("chilexpress")){
+    // OBLIGATORIO: orden de transporte (ej. 50600467816). "Nro. de operación" es OTRO número.
+    let v=matchDigits(/ORDEN\s+DE\s+TRANSPORTE\s*[:\-]?\s*([0-9.,\s]{8,16})/i); if(v) return v;
+    const cs=cands(/\b\d{10,12}\b/g);
+    if(cs.length) return cs[0];
+  }
+  if(/cheval+ier/.test(ag)){
+    const cs=cands(/\b\d{10,14}\b/g);                   // ej. 26520271820
+    if(cs.length){ cs.sort((a,b)=>b.length-a.length); return cs[0]; }
   }
   if(ag.includes("varmont")){
-    let v=matchDigits(/(?:^|\s)(\d{10,14})(?:\s|$)/); if(v) return v;
+    const cs=cands(/\b\d{10,14}\b/g);                   // ej. 081626012740 (mantiene el 0)
+    if(cs.length){ cs.sort((a,b)=>b.length-a.length); return cs[0]; }
+  }
+  if(ag.includes("rapid")){
+    let v=matchDigits(/ODF\s*#?\s*([0-9]{4,12})/i); if(v) return v;   // ej. ODF 239247
+    v=matchDigits(/CORR\.?\s*([0-9]{4,12})/i); if(v) return v;
+  }
+  if(ag.includes("fedex")){
+    let v=matchDigits(/TRK#\s*([0-9 ]{8,20})/i); if(v) return v;       // ej. 876391471312
+    v=matchDigits(/N[ÚU]MERO\s+DE\s+GU[IÍ]A\s*([0-9 ]{8,20})/i); if(v) return v;
+    const cs=cands(/\b\d{12}\b/g); if(cs.length) return cs[0];
   }
   if(ag.includes("pdq")){
     let v=matchDigits(/M\.?R\.?\s*COURIER\s*([0-9]{6,10})/i); if(v) return v;
     v=matchDigits(/ORDEN\s+DE\s+PICK\s*UP.*?([0-9]{6,10})/i); if(v) return v;
-    v=matchDigits(/(?:^|\s)([0-9]{6,10})(?:\s|$)/); if(v) return v;
-  }
-  if(ag.includes("rapid")){
-    let v=matchDigits(/ODF\s*#\s*([0-9]{4,12})/i); if(v) return v;
-    v=matchDigits(/CORR\.?\s*([0-9]{4,12})/i); if(v) return v;
-  }
-  if(ag.includes("chilexpress")){
-    let v=matchDigits(/ORDEN\s+DE\s+TRANSPORTE\s*[:\-]?\s*([0-9]{8,16})/i); if(v) return v;
-    v=matchDigits(/NRO\.?\s+DE\s+OPERACION\s*[:\-]?\s*([0-9]{4,12})/i); if(v) return v;
   }
   if(ag.includes("arriero")){
     let v=matchDigits(/CARTA\s+DE\s+PORTE\s*(?:N[°º])?\s*([0-9]{5,12})/i); if(v) return v;
   }
-  if(ag.includes("fedex")){
-    let v=matchDigits(/TRK#\s*([0-9 ]{8,20})/i); if(v) return v;
-    v=matchDigits(/NUMERO\s+DE\s+GUIA\s*([0-9 ]{8,20})/i); if(v) return v;
-    v=matchDigits(/N[ÚU]MERO\s+DE\s+GU[IÍ]A\s*([0-9 ]{8,20})/i); if(v) return v;
-  }
-  let v=matchDigits(/(?:TRK#|TRACKING|SEGUIMIENTO|GUIA|GU[IÍ]A|N[ÚU]MERO\s+DE\s+GUIA|NUMERO\s+DE\s+GUIA|ORDEN\s+DE\s+TRANSPORTE|ORDEN\s+DE\s+FLETE)\s*[:#N°º.-]*\s*([A-Z0-9 .,-]{5,24})/i);
-  if(v) return v;
-  const all=[...upper.matchAll(/\b\d{6,16}\b/g)].map(x=>x[0]);
+
+  // Fallback general: preferir números pegados a palabras clave de envío
+  const keyRe=/\b(TRK#|TRACKING|SEGUIMIENTO|ORDEN|FLETE|GUIA|GU[IÍ]A|TRANSPORTE|CORR)\b[^0-9]{0,15}(\d{6,14})/gi;
+  let m; const near=[];
+  while((m=keyRe.exec(upper))){ const v=digits(m[2]); if(clean(v)) near.push(v); }
+  if(near.length){ near.sort((a,b)=>b.length-a.length); return near[0]; }
+  const all=cands(/\b\d{6,14}\b/g);
   if(all.length){ all.sort((a,b)=>b.length-a.length); return all[0]; }
   return "";
 }
@@ -840,10 +858,16 @@ function loadTesseract(){
   return _tesseractLoadPromise;
 }
 
-async function ocrImage(file,lang="spa"){
+async function ocrImage(file,lang="spa",psm=null){
   await loadTesseract();
   const {createWorker}=Tesseract;
   const worker=await createWorker(lang);
+  if(psm){
+    await worker.setParameters({
+      tessedit_pageseg_mode:String(psm),
+      ...(psm===6||psm===11 ? {tessedit_char_whitelist:"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-#/:."} : {})
+    });
+  }
   const {data:{text}}=await worker.recognize(file);
   await worker.terminate();
   return text;
@@ -908,6 +932,7 @@ async function handleFile(file){
       const telefono=inferTelefono(text,lines);
       const productosDetectados=extractProductCodes(text);
       if(nombre) state.form.nombre=nombre;
+      if(nombre){ const bs=await consultarBsale(nombre); if(bs){ if(bs.rut && !state.form.rut) state.form.rut=bs.rut; if(bs.telefono && !state.form.telefono) state.form.telefono=formatTelefonoCL(bs.telefono); if(bs.rut||bs.telefono) state.form.extractSuccess=(state.form.extractSuccess?state.form.extractSuccess+" · ":"")+"✓ Datos Bsale"; } }
       if(rut) state.form.rut=rut;
       if(nDoc) state.form.nDoc=nDoc;
       if(telefono) state.form.telefono=telefono;
@@ -921,6 +946,17 @@ async function handleFile(file){
     render(); setTimeout(bindNuevo,0);
   };
   reader.readAsDataURL(file);
+}
+
+// === Bsale: autocompletar RUT (code) y teléfono (phone) del cliente ===
+const WORKER_URL="https://withered-mud-050d.luisfdelascasas24.workers.dev"; // Worker ya existente (notificaciones)
+async function consultarBsale(nombre){
+  if(!nombre || nombre.length<4) return null;
+  try{
+    const res=await fetch(`${WORKER_URL}/cliente?nombre=${encodeURIComponent(nombre)}&k=${APP_SHARED_SECRET}`);
+    if(!res.ok) return null;
+    return await res.json(); // {rut:"", telefono:""}
+  }catch(e){ return null; }
 }
 
 async function guardar(){
@@ -1291,7 +1327,7 @@ function bindDetalle(){
   document.querySelectorAll("[data-doc-open]").forEach(el=>{ el.onclick=()=>openImageOverlay(docImg,`documento-${slugify(d.nombre)}.jpg`); });
   document.querySelectorAll("[data-ticket-open]").forEach(el=>{ const idx=+el.dataset.ticketOpen; el.onclick=()=>openImageOverlay(ticketImgs[idx]); });
   document.querySelectorAll(".btn-estado").forEach(btn=>{ btn.onclick=()=>{ const nuevoEstado=btn.dataset.estado; if(nuevoEstado==="entregado" && !ticketImgs.length){ const seguir=confirm("Este despacho se marcará como entregado sin ticket. ¿Continuar?"); if(!seguir) return; } dbEstado(state.selectedId,btn.dataset.fbkey,nuevoEstado); }; });
-  const btnWa=document.getElementById("btnWhatsapp"); if(btnWa){ btnWa.onclick=async(e)=>{ e.preventDefault(); const mensaje=buildWhatsappMessage(d); try{ if(ticketImgs.length && navigator.share){ const files=[]; for(let i=0;i<ticketImgs.length;i++){ const res=await fetch(ticketImgs[i]); const blob=await res.blob(); files.push(new File([blob],filenameForTicket(d,i),{type:blob.type||"image/jpeg"})); } const shareData={text:mensaje,files}; if(navigator.canShare && !navigator.canShare(shareData)){ throw new Error("share-not-supported"); } await navigator.share(shareData); } else if(navigator.share){ await navigator.share({text:mensaje}); } else { window.open("https://api.whatsapp.com/send?text="+encodeURIComponent(mensaje),"_blank"); } }catch(err){ if(err.name==="AbortError") return; console.error("Error compartiendo",err); try{ if(navigator.clipboard) await navigator.clipboard.writeText(mensaje); }catch(_){} showToast("No se pudo adjuntar la foto automáticamente. Texto copiado — comparte el ticket manualmente."); window.open("https://api.whatsapp.com/send?text="+encodeURIComponent(mensaje),"_blank"); }; }; }
+  const btnWa=document.getElementById("btnWhatsapp"); if(btnWa){ btnWa.onclick=async(e)=>{ e.preventDefault(); const mensaje=buildWhatsappMessage(d); try{ const Cap=window.Capacitor; if(Cap&&Cap.Plugins&&Cap.Plugins.Share&&Cap.Plugins.Filesystem&&ticketImgs.length){ const {Share,Filesystem}=Cap.Plugins; const files=[]; for(let i=0;i<ticketImgs.length;i++){ const blob=await (await fetch(ticketImgs[i])).blob(); const b64=await new Promise(res=>{const fr=new FileReader();fr.onload=()=>res(String(fr.result).split(",")[1]);fr.readAsDataURL(blob);}); const uri=(await Filesystem.writeFile({path:filenameForTicket(d,i),data:b64,directory:"CACHE"})).uri; files.push(uri); } await Share.share({title:"Envío Colderman",text:mensaje,files:files,dialogTitle:"Enviar por WhatsApp"}); return; } if(ticketImgs.length && navigator.share){ const files=[]; for(let i=0;i<ticketImgs.length;i++){ const res=await fetch(ticketImgs[i]); const blob=await res.blob(); files.push(new File([blob],filenameForTicket(d,i),{type:blob.type||"image/jpeg"})); } const shareData={text:mensaje,files}; if(navigator.canShare && !navigator.canShare(shareData)){ throw new Error("share-not-supported"); } await navigator.share(shareData); } else if(navigator.share){ await navigator.share({text:mensaje}); } else { window.open("https://api.whatsapp.com/send?text="+encodeURIComponent(mensaje),"_blank"); } }catch(err){ if(err.name==="AbortError") return; console.error("Error compartiendo",err); try{ if(navigator.clipboard) await navigator.clipboard.writeText(mensaje); }catch(_){} showToast("No se pudo adjuntar la foto automáticamente. Texto copiado — comparte el ticket manualmente."); window.open("https://api.whatsapp.com/send?text="+encodeURIComponent(mensaje),"_blank"); }; }; }
   const btnDesc=document.getElementById("btnDescargarTodo"); if(btnDesc){ btnDesc.onclick=()=>{ if(ticketImgs.length){ const a=document.createElement("a"); a.href=ticketImgs[0]; a.download=filenameForTicket(d,0); a.click(); } else showToast("No hay ticket para descargar"); }; }
   document.getElementById("ticketUpload").onclick=()=>document.getElementById("ticketFileInput").click();
   document.getElementById("ticketFileInput").onchange=e=>guardarTickets(Array.from(e.target.files||[]));
@@ -1346,7 +1382,7 @@ async function guardarTickets(files){
     let trackingDetectado=String(nuevo.tracking||"").trim();
     for(const file of files){
       try{
-        const text=await ocrImage(file,"spa");
+        const text=await ocrImage(file,"eng",6);
         const tracking=detectTrackingByAgency(text, d.agencia==="Otra..."?d.agenciaCustom:d.agencia);
         if(tracking && !trackingDetectado) trackingDetectado=tracking;
         if(String(d.agencia||"").toLowerCase().includes("fedex") && tracking) trackingDetectado=tracking;
