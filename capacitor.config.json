@@ -1,0 +1,17 @@
+{
+  "appId": "com.colderman.despachos",
+  "appName": "Despachos Colderman",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false
+  },
+  "server": {
+    "url": "https://luisfdelascasas24-creator.github.io/despachos-colderman/",
+    "cleartext": false
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 0
+    }
+  }
+}
