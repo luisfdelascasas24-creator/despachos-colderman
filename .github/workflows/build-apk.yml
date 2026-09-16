@@ -9,6 +9,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -20,29 +25,10 @@ jobs:
         run: npx cap add android
 
       - name: Configurar plugin OneSignal (gradle)
-        run: |
-          python3 - <<'EOF'
-          p='android/build.gradle'
-          s=open(p).read()
-          if 'onesignal-gradle-plugin' not in s:
-              s=s.replace('dependencies {', "dependencies {
-        classpath 'gradle.plugin.com.onesignal:onesignal-gradle-plugin:[0.14.0, 0.99.99]'", 1)
-              open(p,'w').write(s)
-          p='android/app/build.gradle'
-          s=open(p).read()
-          if 'onesignal-gradle-plugin' not in s:
-              s="apply plugin: 'com.onesignal.androidsdk.onesignal-gradle-plugin'
-"+s
-              open(p,'w').write(s)
-          EOF
+        run: python3 scripts/onesignal_gradle.py
 
       - name: Sincronizar plugins con Android
         run: npx cap sync android
-
-      - uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
 
       - name: Compilar APK
         run: cd android && chmod +x gradlew && ./gradlew assembleDebug
