@@ -840,6 +840,27 @@ function loadTesseract(){
   return _tesseractLoadPromise;
 }
 
+// Intenta leer el tracking directo desde un código de barras/QR de la foto (rápido y muy confiable).
+// Si el navegador no soporta esto, o no encuentra ningún código, devuelve null y se sigue usando el OCR de texto como respaldo.
+async function detectarTrackingPorCodigoBarras(file){
+  if(!("BarcodeDetector" in window)) return null;
+  try{
+    const formatosDisponibles=await window.BarcodeDetector.getSupportedFormats();
+    const detector=new window.BarcodeDetector({formats:formatosDisponibles});
+    const bitmap=await createImageBitmap(file);
+    const codigos=await detector.detect(bitmap);
+    if(!codigos || !codigos.length) return null;
+    // Preferimos el código con más dígitos/letras (suele ser el número de seguimiento, no un código interno corto)
+    const candidatos=codigos.map(c=>(c.rawValue||"").trim()).filter(v=>v.length>=6);
+    if(!candidatos.length) return null;
+    candidatos.sort((a,b)=>b.length-a.length);
+    return candidatos[0];
+  }catch(e){
+    console.log("No se pudo leer código de barras",e);
+    return null;
+  }
+}
+
 async function ocrImage(file,lang="spa"){
   await loadTesseract();
   const {createWorker}=Tesseract;
@@ -919,6 +940,7 @@ async function handleFile(file){
       }else state.form.extractError="No se pudo extraer. Rellena manualmente.";
     }catch(err){ console.error(err); state.form.extracting=false; state.form.statusMessage=""; state.form.extractError="No se pudo extraer. Rellena manualmente."; }
     render(); setTimeout(bindNuevo,0);
+    if(state.form.nombre) buscarClienteBsale(true);
   };
   reader.readAsDataURL(file);
 }
@@ -1185,12 +1207,12 @@ function renderNuevo(){
 }
 
 // Busca un cliente en Bsale (por su nombre/empresa) para autocompletar RUT y teléfono
-async function buscarClienteBsale(){
+async function buscarClienteBsale(silencioso){
   const btn=document.getElementById("btnBuscarBsale");
   const nombreActual=(state.form.nombre||"").trim();
   const resultadosDiv=document.getElementById("bsaleResultados");
-  if(!nombreActual){ showToast("Escribe primero el nombre del cliente"); return; }
-  if(btn){ btn.disabled=true; btn.textContent="Buscando..."; }
+  if(!nombreActual){ if(!silencioso) showToast("Escribe primero el nombre del cliente"); return; }
+  if(btn){ btn.disabled=true; btn.textContent=silencioso?"🔍 Bsale...":"Buscando..."; }
   if(resultadosDiv) resultadosDiv.innerHTML="";
   try{
     const resp=await fetch(`https://withered-mud-050d.luisfdelascasas24.workers.dev/bsale-search?nombre=${encodeURIComponent(nombreActual)}`,{
@@ -1200,10 +1222,10 @@ async function buscarClienteBsale(){
     const data=await resp.json();
     const items=Array.isArray(data.items)?data.items:[];
     if(items.length===0){
-      showToast("No se encontró ese cliente en Bsale");
+      if(!silencioso) showToast("No se encontró ese cliente en Bsale");
     } else if(items.length===1){
       aplicarClienteBsale(items[0]);
-      showToast("✓ Datos completados desde Bsale");
+      showToast("✓ RUT y teléfono completados desde Bsale");
     } else if(resultadosDiv){
       resultadosDiv.innerHTML=`<div style="background:#1a1a1a;border-radius:10px;padding:8px;margin-top:6px;font-size:13px">${items.map((c,i)=>`<div class="bsale-opcion" data-idx="${i}" style="padding:8px;border-radius:8px;cursor:pointer;display:flex;justify-content:space-between;gap:8px"><span>${c.nombre||c.empresa}</span><span style="color:#888">${c.rut||""}</span></div>`).join("")}</div>`;
       window._bsaleCandidatos=items;
@@ -1213,7 +1235,7 @@ async function buscarClienteBsale(){
     }
   }catch(err){
     console.error("Error buscando en Bsale",err);
-    showToast("No se pudo conectar con Bsale");
+    if(!silencioso) showToast("No se pudo conectar con Bsale");
   }
   if(btn){ btn.disabled=false; btn.textContent="🔍 Bsale"; }
 }
@@ -1238,7 +1260,7 @@ function bindNuevo(){
   const onPasteNuevo=e=>{ const items=e.clipboardData?.items; if(!items) return; for(const item of items){ if(item.type.startsWith("image/")){ e.preventDefault(); handleFile(item.getAsFile()); break; } } };
   document.addEventListener("paste",onPasteNuevo); window._pasteNuevoCleanup=()=>document.removeEventListener("paste",onPasteNuevo);
   document.getElementById("fNombre").oninput=e=>{state.form.nombre=e.target.value;};
-  const btnBuscarBsale=document.getElementById("btnBuscarBsale"); if(btnBuscarBsale) btnBuscarBsale.onclick=buscarClienteBsale;
+  const btnBuscarBsale=document.getElementById("btnBuscarBsale"); if(btnBuscarBsale) btnBuscarBsale.onclick=()=>buscarClienteBsale(false);
   document.getElementById("fRut").oninput=e=>{state.form.rut=e.target.value;};
   document.getElementById("fNDoc").oninput=e=>{state.form.nDoc=e.target.value;};
   const fTel=document.getElementById("fTelefono"); if(fTel) fTel.oninput=e=>{state.form.telefono=e.target.value;};
@@ -1331,7 +1353,7 @@ function bindDetalle(){
   document.querySelectorAll("[data-doc-open]").forEach(el=>{ el.onclick=()=>openImageOverlay(docImg,`documento-${slugify(d.nombre)}.jpg`); });
   document.querySelectorAll("[data-ticket-open]").forEach(el=>{ const idx=+el.dataset.ticketOpen; el.onclick=()=>openImageOverlay(ticketImgs[idx]); });
   document.querySelectorAll(".btn-estado").forEach(btn=>{ btn.onclick=()=>{ const nuevoEstado=btn.dataset.estado; if(nuevoEstado==="entregado" && !ticketImgs.length){ const seguir=confirm("Este despacho se marcará como entregado sin ticket. ¿Continuar?"); if(!seguir) return; } dbEstado(state.selectedId,btn.dataset.fbkey,nuevoEstado); }; });
-  const btnWa=document.getElementById("btnWhatsapp"); if(btnWa){ btnWa.onclick=async(e)=>{ e.preventDefault(); const mensaje=buildWhatsappMessage(d); try{ if(ticketImgs.length && navigator.share){ const files=[]; for(let i=0;i<ticketImgs.length;i++){ const res=await fetch(ticketImgs[i]); const blob=await res.blob(); files.push(new File([blob],filenameForTicket(d,i),{type:blob.type||"image/jpeg"})); } const shareData={text:mensaje,files}; if(navigator.canShare && !navigator.canShare(shareData)){ throw new Error("share-not-supported"); } await navigator.share(shareData); } else if(navigator.share){ await navigator.share({text:mensaje}); } else { window.open("https://api.whatsapp.com/send?text="+encodeURIComponent(mensaje),"_blank"); } }catch(err){ if(err.name==="AbortError") return; console.error("Error compartiendo",err); try{ if(navigator.clipboard) await navigator.clipboard.writeText(mensaje); }catch(_){} showToast("No se pudo adjuntar la foto automáticamente. Texto copiado — comparte el ticket manualmente."); window.open("https://api.whatsapp.com/send?text="+encodeURIComponent(mensaje),"_blank"); }; }; }
+  const btnWa=document.getElementById("btnWhatsapp"); if(btnWa){ btnWa.onclick=async(e)=>{ e.preventDefault(); const mensaje=buildWhatsappMessage(d); try{ if(typeof median!=="undefined" && median.webScreenshot && median.webScreenshot.shareElement){ const imgEl=document.querySelector('[data-ticket-open="0"] img'); if(imgEl){ await median.webScreenshot.shareElement(imgEl,{text:mensaje}); return; } } if(ticketImgs.length && navigator.share){ const files=[]; for(let i=0;i<ticketImgs.length;i++){ const res=await fetch(ticketImgs[i]); const blob=await res.blob(); files.push(new File([blob],filenameForTicket(d,i),{type:blob.type||"image/jpeg"})); } const shareData={text:mensaje,files}; if(navigator.canShare && !navigator.canShare(shareData)){ throw new Error("share-not-supported"); } await navigator.share(shareData); } else if(navigator.share){ await navigator.share({text:mensaje}); } else { window.open("https://api.whatsapp.com/send?text="+encodeURIComponent(mensaje),"_blank"); } }catch(err){ if(err.name==="AbortError") return; console.error("Error compartiendo",err); try{ if(navigator.clipboard) await navigator.clipboard.writeText(mensaje); }catch(_){} showToast("No se pudo adjuntar la foto automáticamente. Texto copiado — comparte el ticket manualmente."); window.open("https://api.whatsapp.com/send?text="+encodeURIComponent(mensaje),"_blank"); }; }; }
   const btnDesc=document.getElementById("btnDescargarTodo"); if(btnDesc){ btnDesc.onclick=()=>{ if(ticketImgs.length){ const a=document.createElement("a"); a.href=ticketImgs[0]; a.download=filenameForTicket(d,0); a.click(); } else showToast("No hay ticket para descargar"); }; }
   document.getElementById("ticketUpload").onclick=()=>document.getElementById("ticketFileInput").click();
   document.getElementById("ticketFileInput").onchange=e=>guardarTickets(Array.from(e.target.files||[]));
@@ -1386,6 +1408,13 @@ async function guardarTickets(files){
     let trackingDetectado=String(nuevo.tracking||"").trim();
     for(const file of files){
       try{
+        // Método 1 (rápido y confiable): código de barras/QR del ticket
+        const porBarcode=await detectarTrackingPorCodigoBarras(file);
+        if(porBarcode && !trackingDetectado) trackingDetectado=porBarcode;
+        if(String(d.agencia||"").toLowerCase().includes("fedex") && porBarcode) trackingDetectado=porBarcode;
+        if(porBarcode) continue; // si ya lo sacamos del código de barras, no hace falta el OCR de texto (lento)
+
+        // Método 2 (respaldo, más lento): OCR de texto
         const text=await ocrImage(file,"spa");
         const tracking=detectTrackingByAgency(text, d.agencia==="Otra..."?d.agenciaCustom:d.agencia);
         if(tracking && !trackingDetectado) trackingDetectado=tracking;
