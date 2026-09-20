@@ -279,6 +279,7 @@ const emptyForm=()=>({
   historial:[]
 });
 
+const _dl=new URLSearchParams(location.search).get("despacho");
 let toastTimeout=null;
 let deferredInstallPrompt=null;
 let state={
@@ -300,6 +301,12 @@ let state={
   notifSupported:('Notification' in window) && ('serviceWorker' in navigator),
   notifPermission:('Notification' in window)?Notification.permission:"unsupported"
 };
+
+state._deepLinkId=_dl?+_dl:null;
+state._deepEnviar=new URLSearchParams(location.search).get("enviar")==="1";
+// Navegación con el botón "atrás" del celular: cada pantalla (detalle, nuevo, foto) es una entrada del historial
+let _profundidad=0, _saltarPop=false;
+history.replaceState({vista:"lista",prof:0},"");
 
 function showToast(msg,ms){
   const old=document.getElementById("appToast");
@@ -357,9 +364,11 @@ function addHistory(despacho,tipo,nota=""){
 
 function openImageOverlay(src,filename){
   const overlay=document.createElement("div");
+  overlay.id="imgOverlay";
   overlay.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px";
   overlay.innerHTML=`<img src="${src}" style="max-width:100%;max-height:100%;border-radius:12px" /><a href="${src}" download="${filename||'documento.jpg'}" onclick="event.stopPropagation()" style="position:fixed;top:16px;right:64px;color:#fff;font-size:26px;text-decoration:none">⬇️</a><button style="position:fixed;top:16px;right:16px;background:none;border:none;color:#fff;font-size:30px;cursor:pointer">✕</button>`;
-  overlay.onclick=()=>overlay.remove();
+  overlay.onclick=()=>{ if(_profundidad>0) history.back(); else overlay.remove(); };
+  _profundidad+=1; history.pushState({vista:"overlay",prof:_profundidad},"");
   document.body.appendChild(overlay);
 }
 function sanitizeName(v){
@@ -513,54 +522,6 @@ function extractProductCodes(text){
 }
 
 function cleanDigits(v){ return String(v||"").replace(/[^\d]/g,""); }
-
-function detectTrackingByAgency(text, agency){
-  const raw=String(text||"");
-  const compact=raw.replace(/\s+/g," ").trim();
-  const upper=compact.toUpperCase();
-  const justDigits=(s)=>cleanDigits(s);
-  function matchDigits(re){
-    const m=upper.match(re);
-    return m ? justDigits(m[1]||m[0]) : "";
-  }
-  const ag=String(agency||"").toLowerCase();
-  if(ag.includes("starken")){
-    let v=matchDigits(/ORDEN\s+DE\s+FLETE(?:\s+NOMINATIVA)?\s*(?:N\.?|N[°º])?\s*([0-9.,]+)/i); if(v) return v;
-    v=matchDigits(/NUMERO\s+DE\s+ORDEN\s+DE\s+FLETE\s*[:\-]?\s*([0-9.,]+)/i); if(v) return v;
-  }
-  if(ag.includes("chevallier")){
-    let v=matchDigits(/(?:^|\s)(\d{10,14})(?:\s|$)/); if(v) return v;
-  }
-  if(ag.includes("varmont")){
-    let v=matchDigits(/(?:^|\s)(\d{10,14})(?:\s|$)/); if(v) return v;
-  }
-  if(ag.includes("pdq")){
-    let v=matchDigits(/M\.?R\.?\s*COURIER\s*([0-9]{6,10})/i); if(v) return v;
-    v=matchDigits(/ORDEN\s+DE\s+PICK\s*UP.*?([0-9]{6,10})/i); if(v) return v;
-    v=matchDigits(/(?:^|\s)([0-9]{6,10})(?:\s|$)/); if(v) return v;
-  }
-  if(ag.includes("rapid")){
-    let v=matchDigits(/ODF\s*#\s*([0-9]{4,12})/i); if(v) return v;
-    v=matchDigits(/CORR\.?\s*([0-9]{4,12})/i); if(v) return v;
-  }
-  if(ag.includes("chilexpress")){
-    let v=matchDigits(/ORDEN\s+DE\s+TRANSPORTE\s*[:\-]?\s*([0-9]{8,16})/i); if(v) return v;
-    v=matchDigits(/NRO\.?\s+DE\s+OPERACION\s*[:\-]?\s*([0-9]{4,12})/i); if(v) return v;
-  }
-  if(ag.includes("arriero")){
-    let v=matchDigits(/CARTA\s+DE\s+PORTE\s*(?:N[°º])?\s*([0-9]{5,12})/i); if(v) return v;
-  }
-  if(ag.includes("fedex")){
-    let v=matchDigits(/TRK#\s*([0-9 ]{8,20})/i); if(v) return v;
-    v=matchDigits(/NUMERO\s+DE\s+GUIA\s*([0-9 ]{8,20})/i); if(v) return v;
-    v=matchDigits(/N[ÚU]MERO\s+DE\s+GU[IÍ]A\s*([0-9 ]{8,20})/i); if(v) return v;
-  }
-  let v=matchDigits(/(?:TRK#|TRACKING|SEGUIMIENTO|GUIA|GU[IÍ]A|N[ÚU]MERO\s+DE\s+GUIA|NUMERO\s+DE\s+GUIA|ORDEN\s+DE\s+TRANSPORTE|ORDEN\s+DE\s+FLETE)\s*[:#N°º.-]*\s*([A-Z0-9 .,-]{5,24})/i);
-  if(v) return v;
-  const all=[...upper.matchAll(/\b\d{6,16}\b/g)].map(x=>x[0]);
-  if(all.length){ all.sort((a,b)=>b.length-a.length); return all[0]; }
-  return "";
-}
 
 function filenameForTicket(d,index=0){
   const base=slugify(d.nombre||"cliente");
@@ -723,7 +684,15 @@ function dataUrlToPngBlob(dataUrl){
   });
 }
 
-// Plan B: si el APK no deja adjuntar directo, copia la foto al portapapeles (o la descarga) y abre WhatsApp con el texto
+// Dentro del APK (Median) el WebView de Android NO permite compartir archivos (no existe navigator.share con fotos).
+// Chrome sí lo permite, así que desde el APK abrimos este mismo despacho en Chrome.
+function estaEnApkMedian(){ return typeof median!=="undefined" && !!median && !!median.window && typeof median.window.open==="function"; }
+function abrirEnChromeParaEnviar(d){
+  const link=`${location.origin}${location.pathname}?despacho=${d.id}&enviar=1`;
+  median.window.open(link,"external");
+}
+
+// Plan B (fuera del APK, ej. computador): copia la foto al portapapeles y abre WhatsApp con el texto
 async function respaldoWhatsappConFoto(d,mensaje,tickets,err){
   const motivo=(err && (err.name||err.message))||"desconocido";
   let copiada=false;
@@ -734,21 +703,20 @@ async function respaldoWhatsappConFoto(d,mensaje,tickets,err){
       copiada=true;
     }
   }catch(e){ console.log("No se pudo copiar la foto al portapapeles",e); }
-  if(!copiada){
-    try{
-      const a=document.createElement("a");
-      a.href=tickets[0]; a.download=filenameForTicket(d,0);
-      document.body.appendChild(a); a.click(); a.remove();
-    }catch(e){ console.log("No se pudo descargar la foto",e); }
-  }
   showToast(copiada
     ? `No se pudo adjuntar directo (${motivo}). Foto copiada: pégala en el chat.`
-    : `No se pudo adjuntar directo (${motivo}). La foto se descargó: adjúntala en el chat.`, 5000);
+    : `No se pudo adjuntar la foto (${motivo}). Descárgala con "⬇️ Descargar ticket" y adjúntala en el chat.`, 5000);
   setTimeout(()=>abrirWhatsappTexto(mensaje),1200);
 }
 
 async function compartirWhatsapp(d,btn){
   const mensaje=buildWhatsappMessage(d);
+  // En el APK no se pueden adjuntar fotos: se abre este despacho en Chrome, donde el envío foto + texto funciona
+  if(estaEnApkMedian() && !(navigator.share && navigator.canShare) && ticketCountFor(d)>0){
+    showToast("Abriendo en Chrome para enviar foto + texto...",3000);
+    abrirEnChromeParaEnviar(d);
+    return;
+  }
   const textoOriginal=btn?btn.textContent:"";
   const restaurar=()=>{ if(btn && btn.isConnected){ btn.disabled=false; btn.textContent=textoOriginal; } };
   if(btn){ btn.disabled=true; btn.textContent="⏳ Preparando..."; }
@@ -788,6 +756,15 @@ function initStorage(){
       const val=snap.val();
       state.despachos=val?Object.entries(val).map(([k,v])=>({...v,fbKey:k})):[];
       state.despachos.sort((a,b)=>(b.ts||0)-(a.ts||0));
+      if(state._deepLinkId){
+        const objetivo=state.despachos.find(x=>x.id===state._deepLinkId);
+        if(objetivo){
+          state._deepLinkId=null;
+          history.replaceState({vista:"lista",prof:0},"",location.pathname);
+          history.pushState({vista:"detalle",prof:1},""); _profundidad=1;
+          state.view="detalle"; state.selectedId=objetivo.id; state._modoEnviar=state._deepEnviar;
+        }
+      }
       render();
     });
   } else {
@@ -850,9 +827,42 @@ function dbActualizar(d){
   }
 }
 function dbEstado(id,fbKey,estado){ const d=state.despachos.find(x=>x.id===id); if(!d) return; const emailActual=(window._auth && window._auth.currentUser && window._auth.currentUser.email) || ""; dbActualizar({...d,estado,editadoPor:emailActual,historial:addHistory(d,"Estado cambiado",`${estado}${emailActual?" · "+nombreDeUsuario(emailActual):""}`)}); showToast("Estado actualizado"); }
-function dbEliminar(id,fbKey){ if(state.useFirebase && fbKey){ window._db.ref("despachos/"+fbKey).remove(); window._db.ref("despachosImgs/"+fbKey).remove(); } else { state.despachos=state.despachos.filter(d=>d.id!==id); saveLocal(); } setState({view:"lista",selectedId:null}); showToast("Despacho eliminado"); }
+function dbEliminar(id,fbKey){ if(state.useFirebase && fbKey){ window._db.ref("despachos/"+fbKey).remove(); window._db.ref("despachosImgs/"+fbKey).remove(); } else { state.despachos=state.despachos.filter(d=>d.id!==id); saveLocal(); } volverALista(); showToast("Despacho eliminado"); }
 
 function setState(p){ if(window._pasteCleanup){window._pasteCleanup();window._pasteCleanup=null;} if(window._pasteNuevoCleanup){window._pasteNuevoCleanup();window._pasteNuevoCleanup=null;} Object.assign(state,p); render(); }
+
+function irADetalle(id){
+  state.listScroll=window.scrollY;
+  _profundidad=1; history.pushState({vista:"detalle",prof:1},"");
+  setState({view:"detalle",selectedId:id});
+}
+function irANuevo(form){
+  if(state.view==="lista") state.listScroll=window.scrollY;
+  _profundidad+=1; history.pushState({vista:"nuevo",prof:_profundidad},"");
+  setState({view:"nuevo",form});
+}
+// Vuelve a la lista (deshace las pantallas apiladas) y regresa a la misma posición donde estabas
+function volverALista(extra){
+  setState({view:"lista",selectedId:null,form:emptyForm(),_restoreScroll:state.listScroll,...(extra||{})});
+  if(_profundidad>0){
+    const n=_profundidad; _profundidad=0;
+    _saltarPop=true; setTimeout(()=>{ _saltarPop=false; },700);
+    history.go(-n);
+  }
+}
+// Botones "←" de la app: igual que el botón atrás del celular
+function volverUnPaso(){ if(_profundidad>0) history.back(); else volverALista(); }
+window.addEventListener("popstate",e=>{
+  const st=e.state||{};
+  _profundidad=st.prof||0;
+  const ov=document.getElementById("imgOverlay");
+  if(ov){ ov.remove(); return; }          // el botón atrás primero cierra la foto abierta
+  if(_saltarPop){ _saltarPop=false; return; }
+  const vista=st.vista||"lista";
+  if(vista==="lista") setState({view:"lista",selectedId:null,form:emptyForm(),_restoreScroll:state.listScroll});
+  else if(vista==="detalle") setState({view:"detalle"});
+  else if(vista==="nuevo") setState({view:"nuevo"});
+});
 function badge(e){ const v=ESTADOS[e]||ESTADOS.pendiente; return `<span class="badge" style="color:${v.color};border-color:${v.color};background:${v.bg}">${v.label}</span>`; }
 function counts(){ return { pendiente:state.despachos.filter(d=>d.estado==="pendiente").length, empacado:state.despachos.filter(d=>d.estado==="empacado").length, entregado:state.despachos.filter(d=>d.estado==="entregado").length, falta_doc:state.despachos.filter(d=>d.estado==="falta_doc").length }; }
 
@@ -938,27 +948,6 @@ function loadTesseract(){
     document.head.appendChild(t);
   });
   return _tesseractLoadPromise;
-}
-
-// Intenta leer el tracking directo desde un código de barras/QR de la foto (rápido y muy confiable).
-// Si el navegador no soporta esto, o no encuentra ningún código, devuelve null y se sigue usando el OCR de texto como respaldo.
-async function detectarTrackingPorCodigoBarras(file){
-  if(!("BarcodeDetector" in window)) return null;
-  try{
-    const formatosDisponibles=await window.BarcodeDetector.getSupportedFormats();
-    const detector=new window.BarcodeDetector({formats:formatosDisponibles});
-    const bitmap=await createImageBitmap(file);
-    const codigos=await detector.detect(bitmap);
-    if(!codigos || !codigos.length) return null;
-    // Preferimos el código con más dígitos/letras (suele ser el número de seguimiento, no un código interno corto)
-    const candidatos=codigos.map(c=>(c.rawValue||"").trim()).filter(v=>v.length>=6);
-    if(!candidatos.length) return null;
-    candidatos.sort((a,b)=>b.length-a.length);
-    return candidatos[0];
-  }catch(e){
-    console.log("No se pudo leer código de barras",e);
-    return null;
-  }
 }
 
 async function ocrImage(file,lang="spa"){
@@ -1073,14 +1062,20 @@ async function guardar(){
     id:existe?f.id:Date.now(), fbKey:existe?(f.fbKey||existe.fbKey||""):(f.fbKey||""), ts:Date.now(), nombre:sanitizeName(f.nombre.trim()), rut:f.rut.trim(), nDoc:(f.nDoc||"").trim(), telefono:(f.telefono||"").trim(), bultos:f.bultos||"", tracking:(f.tracking||"").trim(), productos:Array.isArray(f.productos)?f.productos.filter(p=>p.codigo||p.descripcion):[], docImg:docImgUrl, tipoCompra:f.tipoCompra, empresaNacional:f.empresaNacional, empresaNacionalCustom:(f.empresaNacionalCustom||"").trim(), destino:f.destino, agencia:f.agencia, agenciaCustom:(f.agenciaCustom||"").trim(), direccionDestino:(f.direccionDestino||"").trim(), region:f.region||"", notas:(f.notas||"").trim(), ticketImgs:Array.isArray(f.ticketImgs)?f.ticketImgs:(f.ticketImg?[f.ticketImg]:[]), ticketImg:(Array.isArray(f.ticketImgs)?f.ticketImgs[0]:f.ticketImg)||"", estado:existe?(f.estado||existe.estado||"pendiente"):"pendiente", fecha:existe?(f.fecha||existe.fecha):new Date().toLocaleDateString("es-CL"), creadoPor:existe?(existe.creadoPor||""):emailActual, editadoPor:existe?emailActual:"", historial:existe?addHistory(existe,"Despacho editado",`Se actualizaron datos del despacho${emailActual?" · "+nombreDeUsuario(emailActual):""}`):addHistory({historial:[]},"Despacho creado",`Creación inicial${emailActual?" · "+nombreDeUsuario(emailActual):""}`)
   };
   if(existe){ dbActualizar(base); showToast("Despacho editado"); } else { dbGuardar(base); showToast("Despacho guardado"); state._nuevoDestacadoId=base.id; setTimeout(()=>{ if(state._nuevoDestacadoId===base.id){ state._nuevoDestacadoId=null; render(); } },2200); }
-  setState({view:"lista",form:emptyForm()});
+  volverALista({_restoreScroll:existe?state.listScroll:0});
 }
 
 function render(){
   const app=document.getElementById("app");
-  if(state.view==="nuevo"){ app.innerHTML=renderNuevo(); bindNuevo(); return; }
-  if(state.view==="detalle"){ app.innerHTML=renderDetalle(); bindDetalle(); return; }
+  const cambioVista=state._vistaPrevia!==state.view;
+  state._vistaPrevia=state.view;
+  if(state.view!=="detalle") state._modoEnviar=false;
+  if(state.view==="nuevo"){ app.innerHTML=renderNuevo(); bindNuevo(); if(cambioVista) window.scrollTo(0,0); return; }
+  if(state.view==="detalle"){ app.innerHTML=renderDetalle(); bindDetalle(); if(cambioVista) window.scrollTo(0,0); return; }
   app.innerHTML=renderLista(); bindLista();
+  // al volver desde un despacho, regresamos a la misma posición de la lista
+  const y=state._restoreScroll||0; state._restoreScroll=null;
+  if(cambioVista){ window.scrollTo(0,y); requestAnimationFrame(()=>window.scrollTo(0,y)); }
 }
 
 function renderLista(){
@@ -1241,14 +1236,14 @@ function renderLista(){
 function bindLista(){
   const btnInstall=document.getElementById("btnInstallApp");
   if(btnInstall) btnInstall.onclick=triggerInstall;
-  document.getElementById("btnNuevo").onclick=()=>setState({view:"nuevo",form:emptyForm()});
+  document.getElementById("btnNuevo").onclick=()=>irANuevo(emptyForm());
   document.getElementById("btnExport").onclick=exportCSV;
   const btnLogout=document.getElementById("btnLogout");
   if(btnLogout) btnLogout.onclick=()=>{ if(confirm("¿Cerrar sesión?")) window._auth.signOut().then(()=>location.reload()); };
   const btnActivarNotif=document.getElementById("btnActivarNotif");
   if(btnActivarNotif) btnActivarNotif.onclick=activarNotificaciones;
   Object.keys(ESTADOS).forEach(k=>{ document.getElementById("cnt-"+k).onclick=()=>setState({filtro:state.filtro===k?"todos":k}); });
-  document.querySelectorAll(".card[data-id]").forEach(el=>{ el.onclick=(e)=>{ if(e.target.closest(".quick-wa")) return; setState({view:"detalle",selectedId:+el.dataset.id}); }; });
+  document.querySelectorAll(".card[data-id]").forEach(el=>{ el.onclick=(e)=>{ if(e.target.closest(".quick-wa")) return; irADetalle(+el.dataset.id); }; });
   document.querySelectorAll(".quick-wa").forEach(btn=>{ btn.onclick=(e)=>{ e.stopPropagation(); const d=state.despachos.find(x=>x.id===+btn.dataset.quickwa); if(d) triggerQuickShare(d,btn); }; });
   document.getElementById("searchInput").oninput=e=>{
     const cursorPos=e.target.selectionStart;
@@ -1404,7 +1399,7 @@ function aplicarClienteBsale(c){
 
 function bindNuevo(){
   const re=()=>{ render(); setTimeout(bindNuevo,0); };
-  document.getElementById("btnBack").onclick=()=>setState({view:"lista",form:emptyForm()});
+  document.getElementById("btnBack").onclick=volverUnPaso;
   const uploadArea=document.getElementById("uploadArea"), fileInput=document.getElementById("fileInput"), pdfInput=document.getElementById("pdfInput");
   uploadArea.onclick=()=>fileInput.click();
   fileInput.onchange=e=>handleFile(e.target.files[0]);
@@ -1454,6 +1449,7 @@ function renderDetalle(){
   return `
     <div class="header"><button class="btn-back" id="btnBack">←</button><span style="font-weight:700;font-size:16px">Detalle</span><button class="btn-delete" id="btnDelete">🗑</button></div>
     <div class="page">
+      ${(state._modoEnviar&&ticketImgs.length)?`<button class="btn-primary" id="btnEnviarGrande" style="width:100%;background:#25D366;padding:16px;font-size:16px;margin-bottom:12px">📲 Enviar foto + texto por WhatsApp</button>`:""}
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"><button class="btn-primary" id="btnEditar">✏️ Editar</button><button class="btn-secondary" id="btnShareOnlyText">💬 Texto</button></div>
       <div style="background:#1a1a1a;border-radius:16px;padding:20px;margin-bottom:16px;border:1px solid #2a2a2a"><div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;gap:8px"><div><div style="font-size:18px;font-weight:800">${d.nombre} <span class="btn-copy" data-copy="${(d.nombre||"").toUpperCase().replace(/"/g,"&quot;")}" data-label="Nombre" style="cursor:pointer;font-size:14px;opacity:.6">📋</span></div>${d.rut?`<div style="color:#888;font-size:13px">RUT: ${d.rut} <span class="btn-copy" data-copy="${(d.rut||"").toUpperCase().replace(/"/g,"&quot;")}" data-label="RUT" style="cursor:pointer;opacity:.6">📋</span></div>`:""}</div>${badge(d.estado)}</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">${d.nDoc?`<span class="pill">📄 N° ${d.nDoc}</span>`:""}${d.tracking?`<span class="pill">🚚 ${d.tracking}</span>`:""}${ticketImgs.length?`<span class="pill">🧾 ${ticketImgs.length} ticket${ticketImgs.length>1?"s":""}</span>`:`<span class="pill">🧾 Sin ticket</span>`}</div><div class="row"><span class="lbl">Tipo</span><span class="val">${UP(d.tipoCompra==="importacion"?"🌏 Importación":d.tipoCompra==="mixto"?"🌏🇨🇱 Mixto (Importación + Nacional)":"🇨🇱 Compra nacional")}</span></div>${empresaLabel?`<div class="row"><span class="lbl">Empresa</span><span class="val">${UP(empresaLabel)}</span></div>`:""}<div class="row"><span class="lbl">Destino</span><span class="val">${UP(destinoLabel)}</span></div>${agenciaLabel?`<div class="row"><span class="lbl">Agencia</span><span class="val">${UP(agenciaLabel)} <span class="btn-copy" data-copy="${UP(agenciaLabel).replace(/"/g,"&quot;")}" data-label="Transporte" style="cursor:pointer;opacity:.6">📋</span></span></div>`:""}${d.direccionDestino?`<div class="row"><span class="lbl">Dirección</span><span class="val">${UP(d.direccionDestino)} <span class="btn-copy" data-copy="${UP(d.direccionDestino).replace(/"/g,"&quot;")}" data-label="Dirección" style="cursor:pointer;opacity:.6">📋</span></span></div>`:""}${d.region?`<div class="row"><span class="lbl">Región</span><span class="val">${UP(d.region)}</span></div>`:""}${d.bultos?`<div class="row"><span class="lbl">Bultos</span><span class="val">${UP(d.bultos)}</span></div>`:""}${d.telefono?`<div class="row"><span class="lbl">Teléfono</span><span class="val">${UP(d.telefono)} <span class="btn-copy" data-copy="${UP(d.telefono).replace(/"/g,"&quot;")}" data-label="Teléfono" style="cursor:pointer;opacity:.6">📋</span></span></div>`:""}${d.notas?`<div class="row"><span class="lbl">Notas</span><span class="val">${UP(d.notas)}</span></div>`:""}<div class="row"><span class="lbl">Ingresado</span><span class="val">${UP(d.fecha||"")}</span></div></div>
       <div style="font-size:13px;color:#aaa;font-weight:700;margin:16px 0 10px">DOCUMENTO ORIGINAL</div>
@@ -1483,14 +1479,14 @@ function renderDetalle(){
 function bindDetalle(){
   const d=state.despachos.find(x=>x.id===state.selectedId); if(!d) return;
   const imgs=getImgsFor(d); const docImg=imgs.docImg; const ticketImgs=imgs.ticketImgs;
-  document.getElementById("btnBack").onclick=()=>setState({view:"lista"});
+  document.getElementById("btnBack").onclick=volverUnPaso;
   document.querySelectorAll(".btn-copy").forEach(btn=>{ btn.onclick=()=>copyField(btn.dataset.copy, btn.dataset.label); });
   document.getElementById("btnDelete").onclick=()=>{ if(confirm("¿Eliminar este despacho?")) dbEliminar(state.selectedId,d?.fbKey); };
   document.getElementById("btnEditar").onclick=async()=>{
     const btn=document.getElementById("btnEditar"); const original=btn.textContent;
     btn.disabled=true; btn.textContent="Cargando...";
     const fresh=await fetchImgsNow(d.fbKey);
-    setState({view:"nuevo",form:{...emptyForm(),...d,imgPreview:fresh.docImg||null,ticketImgs:[...fresh.ticketImgs],ticketImg:fresh.ticketImgs[0]||""}});
+    irANuevo({...emptyForm(),...d,imgPreview:fresh.docImg||null,ticketImgs:[...fresh.ticketImgs],ticketImg:fresh.ticketImgs[0]||""});
   };
   const btnText=document.getElementById("btnShareOnlyText"); if(btnText){ btnText.onclick=()=>abrirWhatsappTexto(buildWhatsappMessage(d)); }
   const btnGuardarTracking=document.getElementById("btnGuardarTracking");
@@ -1510,6 +1506,7 @@ function bindDetalle(){
   document.querySelectorAll("[data-doc-open]").forEach(el=>{ el.onclick=()=>openImageOverlay(docImg,`documento-${slugify(d.nombre)}.jpg`); });
   document.querySelectorAll("[data-ticket-open]").forEach(el=>{ const idx=+el.dataset.ticketOpen; el.onclick=()=>openImageOverlay(ticketImgs[idx]); });
   document.querySelectorAll(".btn-estado").forEach(btn=>{ btn.onclick=()=>{ const nuevoEstado=btn.dataset.estado; if(nuevoEstado==="entregado" && !ticketImgs.length){ const seguir=confirm("Este despacho se marcará como entregado sin ticket. ¿Continuar?"); if(!seguir) return; } dbEstado(state.selectedId,btn.dataset.fbkey,nuevoEstado); }; });
+  const btnGrande=document.getElementById("btnEnviarGrande"); if(btnGrande){ btnGrande.onclick=()=>compartirWhatsapp(d,btnGrande); }
   const btnWa=document.getElementById("btnWhatsapp"); if(btnWa){ btnWa.onclick=(e)=>{ e.preventDefault(); compartirWhatsapp(d,btnWa); }; }
   const btnDesc=document.getElementById("btnDescargarTodo"); if(btnDesc){ btnDesc.onclick=()=>{ if(ticketImgs.length){ const a=document.createElement("a"); a.href=ticketImgs[0]; a.download=filenameForTicket(d,0); a.click(); } else showToast("No hay ticket para descargar"); }; }
   document.getElementById("ticketUpload").onclick=()=>document.getElementById("ticketFileInput").click();
@@ -1555,58 +1552,6 @@ async function guardarTickets(files){
   render();
   setTimeout(bindDetalle,0);
 
-  setTimeout(async()=>{
-    state.ticketStatusId=d.id;
-    state.ticketStatusType="info";
-    state.ticketStatusMessage="Leyendo número de seguimiento...";
-    render();
-    setTimeout(bindDetalle,0);
-
-    let trackingDetectado=String(nuevo.tracking||"").trim();
-    for(const file of files){
-      try{
-        // Método 1 (rápido y confiable): código de barras/QR del ticket
-        const porBarcode=await detectarTrackingPorCodigoBarras(file);
-        if(porBarcode && !trackingDetectado) trackingDetectado=porBarcode;
-        if(String(d.agencia||"").toLowerCase().includes("fedex") && porBarcode) trackingDetectado=porBarcode;
-        if(porBarcode) continue; // si ya lo sacamos del código de barras, no hace falta el OCR de texto (lento)
-
-        // Método 2 (respaldo, más lento): OCR de texto
-        const text=await ocrImage(file,"spa");
-        const tracking=detectTrackingByAgency(text, d.agencia==="Otra..."?d.agenciaCustom:d.agencia);
-        if(tracking && !trackingDetectado) trackingDetectado=tracking;
-        if(String(d.agencia||"").toLowerCase().includes("fedex") && tracking) trackingDetectado=tracking;
-      }catch(err){
-        console.log("No se pudo leer tracking de uno de los tickets",err);
-      }
-    }
-
-    if(trackingDetectado && trackingDetectado!==String(nuevo.tracking||"").trim()){
-      nuevo={...nuevo,tracking:trackingDetectado,historial:addHistory(nuevo,"Tracking detectado",trackingDetectado)};
-      dbActualizar(nuevo);
-      state.ticketStatusId=d.id;
-      state.ticketStatusType="info";
-      state.ticketStatusMessage=`Tracking detectado: ${trackingDetectado}`;
-      render();
-      setTimeout(bindDetalle,0);
-      return;
-    }
-
-    if(!trackingDetectado){
-      state.ticketStatusId=d.id;
-      state.ticketStatusType="warn";
-      state.ticketStatusMessage="No se pudo detectar automáticamente. Puedes escribir el tracking manualmente.";
-      render();
-      setTimeout(bindDetalle,0);
-      return;
-    }
-
-    state.ticketStatusId=d.id;
-    state.ticketStatusType="info";
-    state.ticketStatusMessage=`Tracking listo: ${trackingDetectado}`;
-    render();
-    setTimeout(bindDetalle,0);
-  },120);
 }
 
 async function activarNotificaciones(){
