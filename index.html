@@ -1342,17 +1342,10 @@ function prepararCandidatosBsale(items,buscado,rutOcr){
   return out.slice(0,6);
 }
 
-// Variantes del nombre para buscar: completo, sin "LTDA/SPA/SA...", y recortado a las primeras palabras.
-// Así encuentra al cliente aunque Bsale lo tenga escrito más corto o distinto que en la factura.
+// El Worker ahora busca por RUT exacto y por palabras del nombre (ignora LTDA/SPA), así que basta con una sola consulta
 function variantesBusquedaBsale(nombre){
   const limpio=String(nombre||"").replace(/[.,;:]/g," ").replace(/\s+/g," ").trim();
-  let sinSufijo=limpio;
-  while(/\s+(LTDA|LIMITADA|SPA|SA|EIRL|CIA|CIA\.)$/i.test(sinSufijo)) sinSufijo=sinSufijo.replace(/\s+(LTDA|LIMITADA|SPA|SA|EIRL|CIA|CIA\.)$/i,"").trim();
-  const palabras=sinSufijo.split(" ").filter(Boolean);
-  const lista=[limpio,sinSufijo,palabras.slice(0,3).join(" "),palabras.slice(0,2).join(" "),(palabras[0]&&palabras[0].length>=4)?palabras[0]:""];
-  const vistos=new Set(), out=[];
-  for(const v of lista){ const k=v.toLowerCase(); if(!v||vistos.has(k)) continue; vistos.add(k); out.push(v); }
-  return out;
+  return limpio?[limpio]:[];
 }
 async function consultarBsale(nombre,rut){
   const url=`https://withered-mud-050d.luisfdelascasas24.workers.dev/bsale-search?nombre=${encodeURIComponent(nombre)}${rut?`&rut=${encodeURIComponent(rut)}`:""}`;
