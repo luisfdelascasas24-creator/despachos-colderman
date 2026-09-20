@@ -217,6 +217,18 @@
     .dashboard-grid .dashboard-card:nth-child(2){animation-delay:.08s}
     .dashboard-grid .dashboard-card:nth-child(3){animation-delay:.14s}
     .dashboard-grid .dashboard-card:nth-child(4){animation-delay:.20s}
+
+    /* Desplegable de clientes Bsale */
+    .bsale-list{background:var(--panel2);border:1px solid var(--line2);border-radius:14px;margin-top:8px;max-height:260px;overflow-y:auto;box-shadow:var(--shadow)}
+    .bsale-list-head{display:flex;justify-content:space-between;align-items:center;padding:9px 12px;font-size:11px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel2);z-index:1}
+    .bsale-list-head button{background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;padding:0 4px}
+    .bsale-opcion{padding:11px 12px;cursor:pointer;border-bottom:1px solid var(--line)}
+    .bsale-opcion:last-child{border-bottom:none}
+    .bsale-opcion:hover,.bsale-opcion:active{background:rgba(224,123,0,.12)}
+    .bsale-nombre{font-size:14px;font-weight:700;color:#fff;line-height:1.25;word-break:break-word}
+    .bsale-nombre.vacio{color:var(--muted);font-weight:600;font-style:italic}
+    .bsale-rut{font-size:12px;color:var(--muted);margin-top:3px}
+
     @media (max-width:980px){.dashboard-grid{grid-template-columns:repeat(2,1fr)}.layout{flex-direction:column}.layout-side{width:100%}}
     @media (max-width:700px){.list-card-grid{grid-template-columns:1fr}.header{padding:12px 14px}.brand-title{font-size:16px}.header-actions{width:100%;justify-content:flex-end}.btn-main{padding:10px 14px}.dashboard-grid,.counters,.filters-wrap,.layout{padding-left:12px;padding-right:12px}.page{padding:12px}}
     @media (max-width:560px){.header{flex-wrap:wrap;align-items:flex-start}.header-actions{width:100%;display:grid;grid-template-columns:1fr 1fr}.btn-main,.btn-secondary{width:100%}.dashboard-grid{grid-template-columns:1fr 1fr}.counters{grid-template-columns:1fr 1fr 1fr}.search-shell{padding:10px}}
@@ -289,7 +301,7 @@ let state={
   notifPermission:('Notification' in window)?Notification.permission:"unsupported"
 };
 
-function showToast(msg){
+function showToast(msg,ms){
   const old=document.getElementById("appToast");
   if(old) old.remove();
   const el=document.createElement("div");
@@ -301,7 +313,7 @@ function showToast(msg){
   toastTimeout=setTimeout(()=>{
     const t=document.getElementById("appToast");
     if(t) t.remove();
-  },2600);
+  },ms||2600);
 }
 function copyField(text,label){
   if(!text){ showToast("No hay "+label+" para copiar"); return; }
@@ -317,6 +329,10 @@ function normalizeText(v){
     .replace(/[.\-_/]/g,"")
     .replace(/\s+/g," ")
     .trim();
+}
+
+function escapeHtml(v){
+  return String(v==null?"":v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }
 
 function slugify(v){
@@ -675,10 +691,94 @@ async function triggerInstall(){
   render();
 }
 
-function triggerQuickShare(d){
-  const msg=buildWhatsappMessage(d);
-  window.open("https://api.whatsapp.com/send?text="+encodeURIComponent(msg),"_blank");
+/* ============================================================
+   WHATSAPP: foto del ticket + texto (hoja nativa de compartir)
+   ============================================================ */
+function abrirWhatsappTexto(mensaje){
+  window.open("https://api.whatsapp.com/send?text="+encodeURIComponent(mensaje),"_blank");
 }
+
+// Convierte un data URL (base64) en un File real, de forma síncrona (rápido, no pierde el "toque" del usuario)
+function dataUrlToFile(dataUrl,filename){
+  const partes=String(dataUrl).split(",");
+  const mime=((partes[0]||"").match(/data:(.*?);/)||[])[1]||"image/jpeg";
+  const bin=atob(partes[1]||"");
+  const arr=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
+  return new File([arr],filename,{type:mime});
+}
+
+// El portapapeles solo acepta PNG, así que convertimos la foto (solo se usa en el plan B)
+function dataUrlToPngBlob(dataUrl){
+  return new Promise((resolve,reject)=>{
+    const img=new Image();
+    img.onload=()=>{
+      const c=document.createElement("canvas");
+      c.width=img.naturalWidth; c.height=img.naturalHeight;
+      c.getContext("2d").drawImage(img,0,0);
+      c.toBlob(b=>b?resolve(b):reject(new Error("png")),"image/png");
+    };
+    img.onerror=reject;
+    img.src=dataUrl;
+  });
+}
+
+// Plan B: si el APK no deja adjuntar directo, copia la foto al portapapeles (o la descarga) y abre WhatsApp con el texto
+async function respaldoWhatsappConFoto(d,mensaje,tickets,err){
+  const motivo=(err && (err.name||err.message))||"desconocido";
+  let copiada=false;
+  try{
+    if(navigator.clipboard && window.ClipboardItem){
+      const png=await dataUrlToPngBlob(tickets[0]);
+      await navigator.clipboard.write([new ClipboardItem({"image/png":png})]);
+      copiada=true;
+    }
+  }catch(e){ console.log("No se pudo copiar la foto al portapapeles",e); }
+  if(!copiada){
+    try{
+      const a=document.createElement("a");
+      a.href=tickets[0]; a.download=filenameForTicket(d,0);
+      document.body.appendChild(a); a.click(); a.remove();
+    }catch(e){ console.log("No se pudo descargar la foto",e); }
+  }
+  showToast(copiada
+    ? `No se pudo adjuntar directo (${motivo}). Foto copiada: pégala en el chat.`
+    : `No se pudo adjuntar directo (${motivo}). La foto se descargó: adjúntala en el chat.`, 5000);
+  setTimeout(()=>abrirWhatsappTexto(mensaje),1200);
+}
+
+async function compartirWhatsapp(d,btn){
+  const mensaje=buildWhatsappMessage(d);
+  const textoOriginal=btn?btn.textContent:"";
+  const restaurar=()=>{ if(btn && btn.isConnected){ btn.disabled=false; btn.textContent=textoOriginal; } };
+  if(btn){ btn.disabled=true; btn.textContent="⏳ Preparando..."; }
+  let tickets=[];
+  try{
+    if(state.useFirebase && d.fbKey){ tickets=(await fetchImgsNow(d.fbKey)).ticketImgs||[]; }
+    else { tickets=getImgsFor(d).ticketImgs||[]; }
+    if(!tickets.length){
+      restaurar();
+      if(confirm("Este despacho no tiene foto del ticket. ¿Enviar solo el texto?")) abrirWhatsappTexto(mensaje);
+      return;
+    }
+    const files=tickets.map((img,i)=>dataUrlToFile(img,filenameForTicket(d,i)));
+    const data={text:mensaje,files};
+    if(navigator.share && (!navigator.canShare || navigator.canShare(data))){
+      await navigator.share(data); // abre la hoja de compartir con la foto + el texto; eliges WhatsApp y el contacto
+      restaurar();
+      return;
+    }
+    throw new Error("compartir-archivos-no-soportado");
+  }catch(err){
+    restaurar();
+    if(err && err.name==="AbortError") return; // cerraste la hoja de compartir
+    console.error("Error compartiendo por WhatsApp",err);
+    if(tickets.length) await respaldoWhatsappConFoto(d,mensaje,tickets,err);
+    else { showToast("No se pudo preparar el envío"); }
+  }
+}
+
+function triggerQuickShare(d,btn){ return compartirWhatsapp(d,btn); }
 
 // Firebase
 function initStorage(){
@@ -1149,7 +1249,7 @@ function bindLista(){
   if(btnActivarNotif) btnActivarNotif.onclick=activarNotificaciones;
   Object.keys(ESTADOS).forEach(k=>{ document.getElementById("cnt-"+k).onclick=()=>setState({filtro:state.filtro===k?"todos":k}); });
   document.querySelectorAll(".card[data-id]").forEach(el=>{ el.onclick=(e)=>{ if(e.target.closest(".quick-wa")) return; setState({view:"detalle",selectedId:+el.dataset.id}); }; });
-  document.querySelectorAll(".quick-wa").forEach(btn=>{ btn.onclick=(e)=>{ e.stopPropagation(); const d=state.despachos.find(x=>x.id===+btn.dataset.quickwa); if(d) triggerQuickShare(d); }; });
+  document.querySelectorAll(".quick-wa").forEach(btn=>{ btn.onclick=(e)=>{ e.stopPropagation(); const d=state.despachos.find(x=>x.id===+btn.dataset.quickwa); if(d) triggerQuickShare(d,btn); }; });
   document.getElementById("searchInput").oninput=e=>{
     const cursorPos=e.target.selectionStart;
     state.busqueda=e.target.value;
@@ -1206,6 +1306,41 @@ function renderNuevo(){
     </div>`;
 }
 
+/* ============================================================
+   BSALE: búsqueda de cliente (autocompletar RUT y teléfono)
+   ============================================================ */
+// El worker puede devolver el nombre en distintos campos; probamos todos los habituales
+function nombreClienteBsale(c){
+  const candidatos=[c.nombre,c.empresa,c.razonSocial,c.razon_social,c.company,c.name,[c.firstName,c.lastName].filter(Boolean).join(" ")];
+  for(const x of candidatos){ const s=String(x||"").trim(); if(s) return s; }
+  return "";
+}
+function telefonoClienteBsale(c){
+  return String(c.telefono||c.phone||c.cellphone||c.celular||"").trim();
+}
+// Limpia la lista: saca vacíos y repetidos, pone primero el que calza con el RUT leído y limita a 6
+function prepararCandidatosBsale(items,buscado,rutOcr){
+  const rutN=normalizeText(rutOcr), buscN=normalizeText(buscado);
+  const vistos=new Set(), out=[];
+  for(const c of items){
+    const nombre=nombreClienteBsale(c);
+    const rut=String(c.rut||c.code||"").trim();
+    if(!nombre && !rut) continue;
+    const clave=normalizeText(rut)||normalizeText(nombre);
+    if(vistos.has(clave)) continue;
+    vistos.add(clave);
+    const nN=normalizeText(nombre);
+    let score=0;
+    if(rutN && normalizeText(rut)===rutN) score+=100;
+    if(nN && buscN && nN===buscN) score+=50;
+    else if(nN && buscN && (nN.includes(buscN)||buscN.includes(nN))) score+=25;
+    if(nombre) score+=1;
+    out.push({...c,rut,_nombre:nombre,_score:score});
+  }
+  out.sort((a,b)=>b._score-a._score);
+  return out.slice(0,6);
+}
+
 // Busca un cliente en Bsale (por su nombre/empresa) para autocompletar RUT y teléfono
 async function buscarClienteBsale(silencioso){
   const btn=document.getElementById("btnBuscarBsale");
@@ -1220,15 +1355,21 @@ async function buscarClienteBsale(silencioso){
       headers:{ "X-App-Secret":APP_SHARED_SECRET }
     });
     const data=await resp.json();
+    console.log("Respuesta Bsale:",data); // para revisar en consola qué campos trae el worker
     const items=Array.isArray(data.items)?data.items:[];
-    if(items.length===0){
+    const cands=prepararCandidatosBsale(items,nombreActual,state.form.rut);
+    if(cands.length===0){
       if(!silencioso) showToast("No se encontró ese cliente en Bsale");
-    } else if(items.length===1){
-      aplicarClienteBsale(items[0]);
+    } else if(cands[0]._score>=100 || cands.length===1){
+      aplicarClienteBsale(cands[0]);
       showToast("✓ RUT y teléfono completados desde Bsale");
     } else if(resultadosDiv){
-      resultadosDiv.innerHTML=`<div style="background:#1a1a1a;border-radius:10px;padding:8px;margin-top:6px;font-size:13px">${items.map((c,i)=>`<div class="bsale-opcion" data-idx="${i}" style="padding:8px;border-radius:8px;cursor:pointer;display:flex;justify-content:space-between;gap:8px"><span>${c.nombre||c.empresa}</span><span style="color:#888">${c.rut||""}</span></div>`).join("")}</div>`;
-      window._bsaleCandidatos=items;
+      resultadosDiv.innerHTML=`<div class="bsale-list"><div class="bsale-list-head"><span>Elige el cliente (${cands.length})</span><button type="button" id="bsaleCerrar">✕</button></div>${cands.map((c,i)=>{
+        const sub=[c.rut,telefonoClienteBsale(c)].filter(Boolean).join(" · ")||"Sin RUT";
+        return `<div class="bsale-opcion" data-idx="${i}"><div class="bsale-nombre${c._nombre?"":" vacio"}">${escapeHtml(c._nombre||"(sin nombre en Bsale)")}</div><div class="bsale-rut">${escapeHtml(sub)}</div></div>`;
+      }).join("")}</div>`;
+      window._bsaleCandidatos=cands;
+      const cerrar=resultadosDiv.querySelector("#bsaleCerrar"); if(cerrar) cerrar.onclick=()=>{ resultadosDiv.innerHTML=""; };
       resultadosDiv.querySelectorAll(".bsale-opcion").forEach(el=>{
         el.onclick=()=>{ aplicarClienteBsale(window._bsaleCandidatos[Number(el.dataset.idx)]); resultadosDiv.innerHTML=""; showToast("✓ Datos completados desde Bsale"); };
       });
@@ -1242,7 +1383,8 @@ async function buscarClienteBsale(silencioso){
 function aplicarClienteBsale(c){
   if(!c) return;
   if(c.rut){ state.form.rut=c.rut; const el=document.getElementById("fRut"); if(el) el.value=c.rut; }
-  if(c.telefono){ state.form.telefono=c.telefono; const el=document.getElementById("fTelefono"); if(el) el.value=c.telefono; }
+  const tel=telefonoClienteBsale(c);
+  if(tel){ state.form.telefono=tel; const el=document.getElementById("fTelefono"); if(el) el.value=tel; }
 }
 
 function bindNuevo(){
@@ -1314,7 +1456,7 @@ function renderDetalle(){
       </div>
       ${state.ticketStatusId===d.id && state.ticketStatusMessage?`<div class="banner ${state.ticketStatusType==="warn"?"warn":"info"}" style="margin:0 0 12px 0;max-width:none">${state.ticketStatusMessage}</div>`:""}
       <div style="font-size:13px;color:#aaa;font-weight:700;margin:18px 0 10px">TICKETS DE ENTREGA</div>
-      ${ticketImgs.length?`<div class="gallery" style="margin-bottom:10px">${ticketImgs.map((img,idx)=>`<div class="thumb" data-ticket-open="${idx}"><img src="${img}" alt="Ticket ${idx+1}" /><div class="thumb-label">Ticket ${idx+1}</div></div>`).join("")}</div><div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap"><button id="btnWhatsapp" class="btn-primary" style="background:#25D366">📲 WhatsApp</button><button id="btnDescargarTodo" class="btn-secondary">⬇️ Descargar ticket principal</button></div>`:cargandoImgs?`<div style="color:#777;font-size:13px;margin-bottom:10px">⏳ Cargando foto(s)...</div>`:`<div style="color:#555;font-size:13px;margin-bottom:10px">No hay foto del ticket aún.</div>`}
+      ${ticketImgs.length?`<div class="gallery" style="margin-bottom:10px">${ticketImgs.map((img,idx)=>`<div class="thumb" data-ticket-open="${idx}"><img src="${img}" alt="Ticket ${idx+1}" /><div class="thumb-label">Ticket ${idx+1}</div></div>`).join("")}</div><div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap"><button id="btnWhatsapp" class="btn-primary" style="background:#25D366">📲 WhatsApp (foto + texto)</button><button id="btnDescargarTodo" class="btn-secondary">⬇️ Descargar ticket principal</button></div>`:cargandoImgs?`<div style="color:#777;font-size:13px;margin-bottom:10px">⏳ Cargando foto(s)...</div>`:`<div style="color:#555;font-size:13px;margin-bottom:10px">No hay foto del ticket aún.</div>`}
       <div class="upload-area" id="ticketUpload" style="margin-bottom:8px"><div style="font-size:24px">📷</div><div style="color:#ddd;font-size:13px;margin-top:4px;font-weight:700">${ticketImgs.length?"Agregar / cambiar ticket(s)":"Subir ticket(s)"}</div><div style="color:#777;font-size:12px;margin-top:6px">Puedes subir varias fotos. En FedEx, sube las 2.</div></div>
       <div style="text-align:center;font-size:12px;color:#555;margin-bottom:16px">o pega una imagen con <span class="kdb">Ctrl+V</span></div>
       <input type="file" id="ticketFileInput" accept="image/*" multiple style="display:none" />
@@ -1335,7 +1477,7 @@ function bindDetalle(){
     const fresh=await fetchImgsNow(d.fbKey);
     setState({view:"nuevo",form:{...emptyForm(),...d,imgPreview:fresh.docImg||null,ticketImgs:[...fresh.ticketImgs],ticketImg:fresh.ticketImgs[0]||""}});
   };
-  const btnText=document.getElementById("btnShareOnlyText"); if(btnText){ btnText.onclick=()=>window.open("https://api.whatsapp.com/send?text="+encodeURIComponent(buildWhatsappMessage(d)),"_blank"); }
+  const btnText=document.getElementById("btnShareOnlyText"); if(btnText){ btnText.onclick=()=>abrirWhatsappTexto(buildWhatsappMessage(d)); }
   const btnGuardarTracking=document.getElementById("btnGuardarTracking");
   if(btnGuardarTracking){
     btnGuardarTracking.onclick=()=>{
@@ -1353,7 +1495,7 @@ function bindDetalle(){
   document.querySelectorAll("[data-doc-open]").forEach(el=>{ el.onclick=()=>openImageOverlay(docImg,`documento-${slugify(d.nombre)}.jpg`); });
   document.querySelectorAll("[data-ticket-open]").forEach(el=>{ const idx=+el.dataset.ticketOpen; el.onclick=()=>openImageOverlay(ticketImgs[idx]); });
   document.querySelectorAll(".btn-estado").forEach(btn=>{ btn.onclick=()=>{ const nuevoEstado=btn.dataset.estado; if(nuevoEstado==="entregado" && !ticketImgs.length){ const seguir=confirm("Este despacho se marcará como entregado sin ticket. ¿Continuar?"); if(!seguir) return; } dbEstado(state.selectedId,btn.dataset.fbkey,nuevoEstado); }; });
-  const btnWa=document.getElementById("btnWhatsapp"); if(btnWa){ btnWa.onclick=async(e)=>{ e.preventDefault(); const mensaje=buildWhatsappMessage(d); try{ if(typeof median!=="undefined" && median.webScreenshot && median.webScreenshot.shareElement){ const imgEl=document.querySelector('[data-ticket-open="0"] img'); if(imgEl){ await median.webScreenshot.shareElement(imgEl,{text:mensaje}); return; } } if(ticketImgs.length && navigator.share){ const files=[]; for(let i=0;i<ticketImgs.length;i++){ const res=await fetch(ticketImgs[i]); const blob=await res.blob(); files.push(new File([blob],filenameForTicket(d,i),{type:blob.type||"image/jpeg"})); } const shareData={text:mensaje,files}; if(navigator.canShare && !navigator.canShare(shareData)){ throw new Error("share-not-supported"); } await navigator.share(shareData); } else if(navigator.share){ await navigator.share({text:mensaje}); } else { window.open("https://api.whatsapp.com/send?text="+encodeURIComponent(mensaje),"_blank"); } }catch(err){ if(err.name==="AbortError") return; console.error("Error compartiendo",err); try{ if(navigator.clipboard) await navigator.clipboard.writeText(mensaje); }catch(_){} showToast("No se pudo adjuntar la foto automáticamente. Texto copiado — comparte el ticket manualmente."); window.open("https://api.whatsapp.com/send?text="+encodeURIComponent(mensaje),"_blank"); }; }; }
+  const btnWa=document.getElementById("btnWhatsapp"); if(btnWa){ btnWa.onclick=(e)=>{ e.preventDefault(); compartirWhatsapp(d,btnWa); }; }
   const btnDesc=document.getElementById("btnDescargarTodo"); if(btnDesc){ btnDesc.onclick=()=>{ if(ticketImgs.length){ const a=document.createElement("a"); a.href=ticketImgs[0]; a.download=filenameForTicket(d,0); a.click(); } else showToast("No hay ticket para descargar"); }; }
   document.getElementById("ticketUpload").onclick=()=>document.getElementById("ticketFileInput").click();
   document.getElementById("ticketFileInput").onchange=e=>guardarTickets(Array.from(e.target.files||[]));
