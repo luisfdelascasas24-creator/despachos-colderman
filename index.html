@@ -1316,7 +1316,8 @@ function nombreClienteBsale(c){
   return "";
 }
 function telefonoClienteBsale(c){
-  return String(c.telefono||c.phone||c.cellphone||c.celular||"").trim();
+  const raw=String(c.telefono||c.phone||c.cellphone||c.celular||"").trim();
+  return raw?formatTelefonoCL(raw):"";
 }
 // Limpia la lista: saca vacíos y repetidos, pone primero el que calza con el RUT leído y limita a 6
 function prepararCandidatosBsale(items,buscado,rutOcr){
@@ -1341,6 +1342,26 @@ function prepararCandidatosBsale(items,buscado,rutOcr){
   return out.slice(0,6);
 }
 
+// Variantes del nombre para buscar: completo, sin "LTDA/SPA/SA...", y recortado a las primeras palabras.
+// Así encuentra al cliente aunque Bsale lo tenga escrito más corto o distinto que en la factura.
+function variantesBusquedaBsale(nombre){
+  const limpio=String(nombre||"").replace(/[.,;:]/g," ").replace(/\s+/g," ").trim();
+  let sinSufijo=limpio;
+  while(/\s+(LTDA|LIMITADA|SPA|SA|EIRL|CIA|CIA\.)$/i.test(sinSufijo)) sinSufijo=sinSufijo.replace(/\s+(LTDA|LIMITADA|SPA|SA|EIRL|CIA|CIA\.)$/i,"").trim();
+  const palabras=sinSufijo.split(" ").filter(Boolean);
+  const lista=[limpio,sinSufijo,palabras.slice(0,3).join(" "),palabras.slice(0,2).join(" "),(palabras[0]&&palabras[0].length>=4)?palabras[0]:""];
+  const vistos=new Set(), out=[];
+  for(const v of lista){ const k=v.toLowerCase(); if(!v||vistos.has(k)) continue; vistos.add(k); out.push(v); }
+  return out;
+}
+async function consultarBsale(nombre,rut){
+  const url=`https://withered-mud-050d.luisfdelascasas24.workers.dev/bsale-search?nombre=${encodeURIComponent(nombre)}${rut?`&rut=${encodeURIComponent(rut)}`:""}`;
+  const resp=await fetch(url,{ method:"GET", headers:{ "X-App-Secret":APP_SHARED_SECRET } });
+  const data=await resp.json();
+  console.log("Respuesta Bsale ("+nombre+"):",data);
+  return Array.isArray(data.items)?data.items:[];
+}
+
 // Busca un cliente en Bsale (por su nombre/empresa) para autocompletar RUT y teléfono
 async function buscarClienteBsale(silencioso){
   const btn=document.getElementById("btnBuscarBsale");
@@ -1349,18 +1370,19 @@ async function buscarClienteBsale(silencioso){
   if(!nombreActual){ if(!silencioso) showToast("Escribe primero el nombre del cliente"); return; }
   if(btn){ btn.disabled=true; btn.textContent=silencioso?"🔍 Bsale...":"Buscando..."; }
   if(resultadosDiv) resultadosDiv.innerHTML="";
+  const rutLimpio=String(state.form.rut||"").replace(/[.\s]/g,"");
+  let acumulados=[], cands=[], huboError=false;
   try{
-    const resp=await fetch(`https://withered-mud-050d.luisfdelascasas24.workers.dev/bsale-search?nombre=${encodeURIComponent(nombreActual)}`,{
-      method:"GET",
-      headers:{ "X-App-Secret":APP_SHARED_SECRET }
-    });
-    const data=await resp.json();
-    console.log("Respuesta Bsale:",data); // para revisar en consola qué campos trae el worker
-    const items=Array.isArray(data.items)?data.items:[];
-    const cands=prepararCandidatosBsale(items,nombreActual,state.form.rut);
+    let primeraConsulta=true;
+    for(const q of variantesBusquedaBsale(nombreActual)){
+      try{ acumulados=acumulados.concat(await consultarBsale(q,primeraConsulta?rutLimpio:"")); primeraConsulta=false; }
+      catch(e){ huboError=true; console.error("Error consultando Bsale con",q,e); continue; }
+      cands=prepararCandidatosBsale(acumulados,nombreActual,state.form.rut);
+      if(cands.length && cands[0]._score>=100) break; // ya calzó el RUT exacto, no hace falta seguir
+    }
     if(cands.length===0){
-      if(!silencioso) showToast("No se encontró ese cliente en Bsale");
-    } else if(cands[0]._score>=100 || cands.length===1){
+      if(!silencioso) showToast(huboError?"No se pudo conectar con Bsale":"No se encontró ese cliente en Bsale. Prueba con menos palabras del nombre.",4000);
+    } else if(cands[0]._score>=100 || (cands.length===1 && (!state.form.rut || cands[0]._score>=25))){
       aplicarClienteBsale(cands[0]);
       showToast("✓ RUT y teléfono completados desde Bsale");
     } else if(resultadosDiv){
