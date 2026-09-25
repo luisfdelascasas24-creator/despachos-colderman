@@ -827,6 +827,12 @@ function dbActualizar(d){
   }
 }
 function dbEstado(id,fbKey,estado){ const d=state.despachos.find(x=>x.id===id); if(!d) return; const emailActual=(window._auth && window._auth.currentUser && window._auth.currentUser.email) || ""; dbActualizar({...d,estado,editadoPor:emailActual,historial:addHistory(d,"Estado cambiado",`${estado}${emailActual?" · "+nombreDeUsuario(emailActual):""}`)}); showToast("Estado actualizado"); }
+function dbTicketEnviado(id,valor){
+  const d=state.despachos.find(x=>x.id===id); if(!d) return;
+  const emailActual=(window._auth && window._auth.currentUser && window._auth.currentUser.email) || "";
+  dbActualizar({...d,ticketEnviado:valor,historial:addHistory(d,valor?"Ticket marcado como enviado":"Ticket desmarcado como enviado",emailActual?nombreDeUsuario(emailActual):"")});
+  showToast(valor?"✅ Marcado como enviado":"Desmarcado como enviado");
+}
 function dbEliminar(id,fbKey){ if(state.useFirebase && fbKey){ window._db.ref("despachos/"+fbKey).remove(); window._db.ref("despachosImgs/"+fbKey).remove(); } else { state.despachos=state.despachos.filter(d=>d.id!==id); saveLocal(); } volverALista(); showToast("Despacho eliminado"); }
 
 function setState(p){ if(window._pasteCleanup){window._pasteCleanup();window._pasteCleanup=null;} if(window._pasteNuevoCleanup){window._pasteNuevoCleanup();window._pasteNuevoCleanup=null;} Object.assign(state,p); render(); }
@@ -1089,6 +1095,7 @@ function renderLista(){
     if(state.filtroAgencia) arr=arr.filter(d=>getAgencyLabel(d)===state.filtroAgencia);
     if(state.filtroExtra==="atrasados") arr=arr.filter(d=>d.estado==="pendiente" && d.fecha!==hoy);
     if(state.filtroExtra==="sin_ticket") arr=arr.filter(d=>d.estado==="entregado" && !ticketCountFor(d));
+    if(state.filtroExtra==="sin_enviar") arr=arr.filter(d=>ticketCountFor(d)>0 && !d.ticketEnviado);
     if(state.filtroExtra==="nacional") arr=arr.filter(d=>d.tipoCompra==="nacional");
     if(state.filtroExtra==="importacion") arr=arr.filter(d=>d.tipoCompra==="importacion");
     if(state.busqueda.trim()){
@@ -1147,7 +1154,13 @@ function renderLista(){
         </div>
 
         <div class="card-footer">
-          <div class="${ticketCount?"ticket-count":"ticket-none"}">${ticketCount?`🧾 ${ticketCount} ticket${ticketCount>1?"s":""}`:"🧾 Sin ticket"}</div>
+          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+            <div class="${ticketCount?"ticket-count":"ticket-none"}">${ticketCount?`🧾 ${ticketCount} ticket${ticketCount>1?"s":""}`:"🧾 Sin ticket"}</div>
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:800;color:${d.ticketEnviado?"#10b981":"#8a8f98"};cursor:pointer" onclick="event.stopPropagation()">
+              <input type="checkbox" data-chk-enviado="${d.id}" ${d.ticketEnviado?"checked":""} style="accent-color:#10b981;width:16px;height:16px;cursor:pointer" />
+              ✅ Enviado
+            </label>
+          </div>
           <button class="btn-secondary quick-wa" data-quickwa="${d.id}" style="padding:9px 12px;font-size:12px">📲 Enviar por WhatsApp</button>
         </div>
       </div>`;
@@ -1202,6 +1215,7 @@ function renderLista(){
         <div class="chips">
           <button class="chip ${state.filtroExtra==="atrasados"?"active":""}" id="chipAtrasados">Pendientes atrasados</button>
           <button class="chip ${state.filtroExtra==="sin_ticket"?"active":""}" id="chipSinTicket">Sin ticket</button>
+          <button class="chip ${state.filtroExtra==="sin_enviar"?"active":""}" id="chipSinEnviar">🧾 Con ticket, sin enviar</button>
           <button class="chip ${state.filtroExtra==="importacion"?"active":""}" id="chipImportacion">Importación</button>
           <button class="chip ${state.filtroExtra==="nacional"?"active":""}" id="chipNacional">Nacional</button>
           ${(state.filtroExtra||state.filtroAgencia||state.filtroFecha||state.filtroDia==="hoy"||state.filtro!=="todos")?`<button class="chip" id="chipLimpiarTodo">Limpiar filtros</button>`:""}
@@ -1258,6 +1272,8 @@ function bindLista(){
   const x1=document.getElementById("btnLimpiarFecha"); if(x1) x1.onclick=()=>setState({filtroFecha:""});
   document.getElementById("chipAtrasados").onclick=()=>setState({filtroExtra:state.filtroExtra==="atrasados"?"":"atrasados"});
   document.getElementById("chipSinTicket").onclick=()=>setState({filtroExtra:state.filtroExtra==="sin_ticket"?"":"sin_ticket"});
+  document.getElementById("chipSinEnviar").onclick=()=>setState({filtroExtra:state.filtroExtra==="sin_enviar"?"":"sin_enviar"});
+  document.querySelectorAll("[data-chk-enviado]").forEach(cb=>{ cb.onchange=(e)=>{ e.stopPropagation(); dbTicketEnviado(+cb.dataset.chkEnviado,cb.checked); }; });
   document.getElementById("chipImportacion").onclick=()=>setState({filtroExtra:state.filtroExtra==="importacion"?"":"importacion"});
   document.getElementById("chipNacional").onclick=()=>setState({filtroExtra:state.filtroExtra==="nacional"?"":"nacional"});
   const clearAll=document.getElementById("chipLimpiarTodo"); if(clearAll){ clearAll.onclick=()=>setState({filtro:"todos",filtroDia:"todos",filtroAgencia:"",filtroFecha:"",filtroExtra:""}); }
@@ -1466,7 +1482,13 @@ function renderDetalle(){
         </div>
       </div>
       ${state.ticketStatusId===d.id && state.ticketStatusMessage?`<div class="banner ${state.ticketStatusType==="warn"?"warn":"info"}" style="margin:0 0 12px 0;max-width:none">${state.ticketStatusMessage}</div>`:""}
-      <div style="font-size:13px;color:#aaa;font-weight:700;margin:18px 0 10px">TICKETS DE ENTREGA</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin:18px 0 10px">
+        <div style="font-size:13px;color:#aaa;font-weight:700">TICKETS DE ENTREGA</div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;color:${d.ticketEnviado?"#10b981":"#8a8f98"};cursor:pointer;background:${d.ticketEnviado?"#002a1a":"#1a1a1a"};border:1px solid ${d.ticketEnviado?"#10b981":"#333"};border-radius:12px;padding:8px 12px">
+          <input type="checkbox" id="chkTicketEnviadoDetalle" ${d.ticketEnviado?"checked":""} style="accent-color:#10b981;width:17px;height:17px;cursor:pointer" />
+          ✅ Ticket enviado al cliente
+        </label>
+      </div>
       ${ticketImgs.length?`<div class="gallery" style="margin-bottom:10px">${ticketImgs.map((img,idx)=>`<div class="thumb" data-ticket-open="${idx}"><img src="${img}" alt="Ticket ${idx+1}" /><div class="thumb-label">Ticket ${idx+1}</div></div>`).join("")}</div><div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap"><button id="btnWhatsapp" class="btn-primary" style="background:#25D366">📲 WhatsApp (foto + texto)</button><button id="btnDescargarTodo" class="btn-secondary">⬇️ Descargar ticket principal</button></div>`:cargandoImgs?`<div style="color:#777;font-size:13px;margin-bottom:10px">⏳ Cargando foto(s)...</div>`:`<div style="color:#555;font-size:13px;margin-bottom:10px">No hay foto del ticket aún.</div>`}
       <div class="upload-area" id="ticketUpload" style="margin-bottom:8px"><div style="font-size:24px">📷</div><div style="color:#ddd;font-size:13px;margin-top:4px;font-weight:700">${ticketImgs.length?"Agregar / cambiar ticket(s)":"Subir ticket(s)"}</div><div style="color:#777;font-size:12px;margin-top:6px">Puedes subir varias fotos. En FedEx, sube las 2.</div></div>
       <div style="text-align:center;font-size:12px;color:#555;margin-bottom:16px">o pega una imagen con <span class="kdb">Ctrl+V</span></div>
@@ -1506,6 +1528,7 @@ function bindDetalle(){
   document.querySelectorAll("[data-doc-open]").forEach(el=>{ el.onclick=()=>openImageOverlay(docImg,`documento-${slugify(d.nombre)}.jpg`); });
   document.querySelectorAll("[data-ticket-open]").forEach(el=>{ const idx=+el.dataset.ticketOpen; el.onclick=()=>openImageOverlay(ticketImgs[idx]); });
   document.querySelectorAll(".btn-estado").forEach(btn=>{ btn.onclick=()=>{ const nuevoEstado=btn.dataset.estado; if(nuevoEstado==="entregado" && !ticketImgs.length){ const seguir=confirm("Este despacho se marcará como entregado sin ticket. ¿Continuar?"); if(!seguir) return; } dbEstado(state.selectedId,btn.dataset.fbkey,nuevoEstado); }; });
+  const chkEnviadoDetalle=document.getElementById("chkTicketEnviadoDetalle"); if(chkEnviadoDetalle) chkEnviadoDetalle.onchange=(e)=>dbTicketEnviado(d.id,e.target.checked);
   const btnGrande=document.getElementById("btnEnviarGrande"); if(btnGrande){ btnGrande.onclick=()=>compartirWhatsapp(d,btnGrande); }
   const btnWa=document.getElementById("btnWhatsapp"); if(btnWa){ btnWa.onclick=(e)=>{ e.preventDefault(); compartirWhatsapp(d,btnWa); }; }
   const btnDesc=document.getElementById("btnDescargarTodo"); if(btnDesc){ btnDesc.onclick=()=>{ if(ticketImgs.length){ const a=document.createElement("a"); a.href=ticketImgs[0]; a.download=filenameForTicket(d,0); a.click(); } else showToast("No hay ticket para descargar"); }; }
