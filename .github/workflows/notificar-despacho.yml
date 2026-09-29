@@ -20,7 +20,7 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{
               "app_id": "'"${ONESIGNAL_APP_ID}"'",
-              "included_segments": ["Subscribed Users"],
+              "included_segments": ["Total Subscriptions"],
               "headings": {"en": "📦 Despachos Colderman"},
               "contents": {"en": "Hay un despacho nuevo para revisar"},
               "url": "https://luisfdelascasas24-creator.github.io/despachos-colderman/"
