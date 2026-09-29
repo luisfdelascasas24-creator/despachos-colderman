@@ -1,0 +1,27 @@
+name: Notificar nuevo despacho
+
+# Se activa al instante cuando el Cloudflare Worker avisa que hay un despacho nuevo.
+on:
+  repository_dispatch:
+    types: [nuevo-despacho]
+  workflow_dispatch: {}   # permite probarlo a mano desde la pestaña Actions
+
+jobs:
+  notificar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enviar notificación push (OneSignal)
+        env:
+          ONESIGNAL_APP_ID: "50716c0f-96b3-4963-945b-fb047105e2ee"
+          ONESIGNAL_REST_API_KEY: ${{ secrets.ONESIGNAL_REST_API_KEY }}
+        run: |
+          curl -s -X POST "https://api.onesignal.com/notifications" \
+            -H "Authorization: Key ${ONESIGNAL_REST_API_KEY}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "app_id": "'"${ONESIGNAL_APP_ID}"'",
+              "included_segments": ["Subscribed Users"],
+              "headings": {"en": "📦 Despachos Colderman"},
+              "contents": {"en": "Hay un despacho nuevo para revisar"},
+              "url": "https://luisfdelascasas24-creator.github.io/despachos-colderman/"
+            }'
