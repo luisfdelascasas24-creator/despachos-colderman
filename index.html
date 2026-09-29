@@ -538,6 +538,24 @@ function getAgencyLabel(d){
 }
 function getEmpresaLabel(d){ return d.empresaNacional==="Otra..."?(d.empresaNacionalCustom||"Otra"):d.empresaNacional; }
 
+// Junta, por empresa proveedora, qué hay que ir a retirar (solo despachos aún "pendiente" de compra nacional/mixta)
+// Agrupa por DESPACHO (no por producto suelto) para poder marcar "etiqueta y factura listas" una sola vez por cliente.
+function retirosNacionalPorEmpresa(){
+  const pendientes=state.despachos.filter(d=>d.estado==="pendiente" && (d.tipoCompra==="nacional"||d.tipoCompra==="mixto"));
+  const grupos={};
+  pendientes.forEach(d=>{
+    const empresa=getEmpresaLabel(d)||"Empresa sin especificar";
+    const marcados=(Array.isArray(d.productos)?d.productos:[]).filter(p=>p.nacional);
+    const items=marcados.length?marcados:(d.tipoCompra==="nacional"?(d.productos||[]):[]);
+    const textos=items.length
+      ? items.map(p=>p.codigo?`${p.codigo}${p.descripcion?" — "+p.descripcion:""}`:(p.descripcion||"Producto sin código"))
+      : ["Revisar productos del despacho (mixto, sin marcar)"];
+    grupos[empresa]=grupos[empresa]||[];
+    grupos[empresa].push({id:d.id,cliente:d.nombre,documentosListos:!!d.documentosListos,items:textos});
+  });
+  return grupos;
+}
+
 function exportCSV(){
   const head=["Nombre","RUT","Documento","Tracking","Estado","Fecha","Tipo","Destino","Agencia","Dirección","Notas","Tickets"];
   const rows=state.despachos.map(d=>[
@@ -832,6 +850,12 @@ function dbTicketEnviado(id,valor){
   const emailActual=(window._auth && window._auth.currentUser && window._auth.currentUser.email) || "";
   dbActualizar({...d,ticketEnviado:valor,historial:addHistory(d,valor?"Ticket marcado como enviado":"Ticket desmarcado como enviado",emailActual?nombreDeUsuario(emailActual):"")});
   showToast(valor?"✅ Marcado como enviado":"Desmarcado como enviado");
+}
+function dbDocumentosListos(id,valor){
+  const d=state.despachos.find(x=>x.id===id); if(!d) return;
+  const emailActual=(window._auth && window._auth.currentUser && window._auth.currentUser.email) || "";
+  dbActualizar({...d,documentosListos:valor,historial:addHistory(d,valor?"Etiqueta y factura listas (a la espera del producto)":"Desmarcado: etiqueta/factura listas",emailActual?nombreDeUsuario(emailActual):"")});
+  showToast(valor?"📋 Listo: a la espera del producto":"Desmarcado");
 }
 function dbEliminar(id,fbKey){ if(state.useFirebase && fbKey){ window._db.ref("despachos/"+fbKey).remove(); window._db.ref("despachosImgs/"+fbKey).remove(); } else { state.despachos=state.despachos.filter(d=>d.id!==id); saveLocal(); } volverALista(); showToast("Despacho eliminado"); }
 
@@ -1236,6 +1260,23 @@ function renderLista(){
           if(Object.keys(conteo).length===0) return `<div class="mini-card" style="font-size:12px;color:#555;text-align:center">Nada empacado todavía</div>`;
           return Object.entries(conteo).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<div class="resumen-item" data-agencia="${k}" style="background:${state.filtroAgencia===k?"#001a33":"#151518"};border-color:${state.filtroAgencia===k?"#3b82f6":"rgba(255,255,255,.07)"}"><span style="font-size:12px;color:#ccc;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${k}</span><span style="font-size:14px;font-weight:800;color:#3b82f6;margin-left:6px">${v}</span></div>`).join("");
         })()}
+        ${(()=>{
+          const grupos=retirosNacionalPorEmpresa();
+          const empresas=Object.keys(grupos);
+          if(!empresas.length) return "";
+          return `<div class="summary-title" style="color:#e07b00;margin-top:16px">🏭 Por retirar (compra nacional)</div>` + empresas.map(emp=>`
+            <div class="mini-card" style="margin-bottom:8px">
+              <div style="font-size:12px;font-weight:900;color:#ff8c00;margin-bottom:8px">${emp} <span style="color:#777;font-weight:700">(${grupos[emp].length})</span></div>
+              ${grupos[emp].map(g=>`
+                <div style="margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #262629">
+                  <label style="display:flex;align-items:flex-start;gap:6px;font-size:11px;font-weight:800;color:${g.documentosListos?"#10b981":"#ccc"};cursor:pointer;margin-bottom:3px">
+                    <input type="checkbox" data-chk-doclisto="${g.id}" ${g.documentosListos?"checked":""} style="accent-color:#10b981;width:14px;height:14px;cursor:pointer;margin-top:1px;flex-shrink:0" />
+                    <span>${g.cliente}${g.documentosListos?" · 📋 listo, a la espera del producto":""}</span>
+                  </label>
+                  ${g.items.map(it=>`<div style="font-size:11px;color:#999;margin-left:20px;line-height:1.4">${it}</div>`).join("")}
+                </div>`).join("")}
+            </div>`).join("");
+        })()}
         <div class="summary-title" style="margin-top:16px">Resumen pendiente</div>
         ${(()=>{
           const pend=state.despachos.filter(d=>d.estado==="pendiente");
@@ -1274,6 +1315,7 @@ function bindLista(){
   document.getElementById("chipSinTicket").onclick=()=>setState({filtroExtra:state.filtroExtra==="sin_ticket"?"":"sin_ticket"});
   document.getElementById("chipSinEnviar").onclick=()=>setState({filtroExtra:state.filtroExtra==="sin_enviar"?"":"sin_enviar"});
   document.querySelectorAll("[data-chk-enviado]").forEach(cb=>{ cb.onchange=(e)=>{ e.stopPropagation(); dbTicketEnviado(+cb.dataset.chkEnviado,cb.checked); }; });
+  document.querySelectorAll("[data-chk-doclisto]").forEach(cb=>{ cb.onchange=(e)=>{ e.stopPropagation(); dbDocumentosListos(+cb.dataset.chkDoclisto,cb.checked); }; });
   document.getElementById("chipImportacion").onclick=()=>setState({filtroExtra:state.filtroExtra==="importacion"?"":"importacion"});
   document.getElementById("chipNacional").onclick=()=>setState({filtroExtra:state.filtroExtra==="nacional"?"":"nacional"});
   const clearAll=document.getElementById("chipLimpiarTodo"); if(clearAll){ clearAll.onclick=()=>setState({filtro:"todos",filtroDia:"todos",filtroAgencia:"",filtroFecha:"",filtroExtra:""}); }
@@ -1300,6 +1342,7 @@ function renderNuevo(){
         <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center" data-prod-row="${idx}">
           <input class="prod-codigo" data-idx="${idx}" value="${p.codigo||""}" placeholder="Código (ej: CMP-7958)" style="width:160px;font-weight:800;color:#ff8c00" />
           <input class="prod-desc" data-idx="${idx}" value="${p.descripcion||""}" placeholder="Descripción" style="flex:1" />
+          ${isNacional?`<label title="Se retira en la compra nacional (${f.empresaNacional==="Otra..."?(f.empresaNacionalCustom||"Otra"):(f.empresaNacional||"la empresa elegida arriba")})" style="display:flex;align-items:center;gap:4px;font-size:16px;flex-shrink:0;cursor:pointer;background:${p.nacional?"#3b2400":"transparent"};border:1px solid ${p.nacional?"#e07b00":"#333"};border-radius:8px;padding:6px 8px"><input type="checkbox" class="prod-nacional" data-idx="${idx}" ${p.nacional?"checked":""} style="accent-color:#e07b00;width:15px;height:15px;cursor:pointer;margin:0" />🏭</label>`:""}
           <button type="button" class="btn-delete prod-remove" data-idx="${idx}" style="flex-shrink:0">🗑</button>
         </div>`).join("")}</div>
       <button type="button" id="btnAgregarProducto" class="btn-secondary" style="margin-bottom:14px">➕ Agregar producto</button>
@@ -1307,7 +1350,7 @@ function renderNuevo(){
       <div class="section-sep">Tipo de compra</div>
       <div class="tabs"><div class="tab ${f.tipoCompra==="importacion"?"active":""}" id="tabImport">🌏 Importación</div><div class="tab ${f.tipoCompra==="nacional"?"active":""}" id="tabNacional">🇨🇱 Compra nacional</div><div class="tab ${f.tipoCompra==="mixto"?"active":""}" id="tabMixto">🌏🇨🇱 Mixto</div></div>
       ${(f.tipoCompra==="nacional"||f.tipoCompra==="mixto")?`<div class="field"><label>Empresa proveedora (parte nacional)</label><select id="fEmpresaNacional"><option value="">Seleccionar empresa...</option>${EMPRESAS_NACIONAL.map(e=>`<option ${f.empresaNacional===e?"selected":""}>${e}</option>`).join("")}</select></div>${showEmpresaCustom?`<div class="field"><label>¿Cuál empresa?</label><input id="fEmpresaCustom" value="${f.empresaNacionalCustom||""}" placeholder="Nombre de la empresa" /></div>`:""}`:""}
-      ${f.tipoCompra==="mixto"?`<div style="background:#1a1a1a;border-radius:12px;padding:12px;margin-bottom:14px;font-size:12px;color:#ff8c00">💡 Marca en la lista de productos de arriba cuáles son de importación y cuáles nacionales, escribiéndolo en la descripción de cada uno.</div>`:""}
+      ${f.tipoCompra==="mixto"?`<div style="background:#1a1a1a;border-radius:12px;padding:12px;margin-bottom:14px;font-size:12px;color:#ff8c00">💡 Marca con el ícono 🏭 en la lista de productos de arriba cuáles se retiran en la compra nacional.</div>`:""}
       <div class="section-sep">Destino del envío</div>
       <div class="tabs"><div class="tab ${isProvincia?"active":""}" id="tabProvincia">📦 Región</div><div class="tab ${f.destino==="oficina"?"active":""}" id="tabOficina">🏢 Oficina</div><div class="tab ${f.destino==="bodega"?"active":""}" id="tabBodega">🏭 Bodega</div></div>
       ${isProvincia?`<div class="field"><label>Agencia de envío</label><select id="fAgencia"><option value="">Seleccionar agencia...</option>${AGENCIAS.map(a=>`<option ${f.agencia===a?"selected":""}>${a}</option>`).join("")}</select></div>${showAgenciaCustom?`<div class="field"><label>¿Cuál agencia?</label><input id="fAgenciaCustom" value="${f.agenciaCustom||""}" placeholder="Nombre de la agencia" /></div>`:""}<div class="field"><label>Dirección / sucursal de destino</label><input id="fDireccion" value="${f.direccionDestino||""}" placeholder="Ej: Sucursal Starken Talca, Av. O'Higgins 123" /></div>`:`<div style="background:#1a1a1a;border-radius:12px;padding:12px;margin-bottom:14px;font-size:13px;color:#888">${f.destino==="oficina"?"🏢 El pedido se recibe en oficina.":"🏭 El pedido se recoge en bodega."}</div>`}
@@ -1448,8 +1491,9 @@ function bindNuevo(){
   const fno=document.getElementById("fNotas"); if(fno) fno.oninput=e=>{state.form.notas=e.target.value;};
   document.querySelectorAll(".prod-codigo").forEach(inp=>{ inp.oninput=e=>{ const idx=+inp.dataset.idx; state.form.productos[idx]=state.form.productos[idx]||{}; state.form.productos[idx].codigo=e.target.value; }; });
   document.querySelectorAll(".prod-desc").forEach(inp=>{ inp.oninput=e=>{ const idx=+inp.dataset.idx; state.form.productos[idx]=state.form.productos[idx]||{}; state.form.productos[idx].descripcion=e.target.value; }; });
+  document.querySelectorAll(".prod-nacional").forEach(inp=>{ inp.onchange=e=>{ const idx=+inp.dataset.idx; state.form.productos[idx]=state.form.productos[idx]||{}; state.form.productos[idx].nacional=inp.checked; e.target.closest("label").style.background=inp.checked?"#3b2400":"transparent"; e.target.closest("label").style.borderColor=inp.checked?"#e07b00":"#333"; }; });
   document.querySelectorAll(".prod-remove").forEach(btn=>{ btn.onclick=()=>{ const idx=+btn.dataset.idx; state.form.productos.splice(idx,1); re(); }; });
-  const btnAgregarProducto=document.getElementById("btnAgregarProducto"); if(btnAgregarProducto) btnAgregarProducto.onclick=()=>{ state.form.productos=[...(state.form.productos||[]),{codigo:"",descripcion:""}]; re(); };
+  const btnAgregarProducto=document.getElementById("btnAgregarProducto"); if(btnAgregarProducto) btnAgregarProducto.onclick=()=>{ state.form.productos=[...(state.form.productos||[]),{codigo:"",descripcion:"",nacional:state.form.tipoCompra==="nacional"}]; re(); };
   document.getElementById("btnGuardar").onclick=guardar;
 }
 
@@ -1470,7 +1514,12 @@ function renderDetalle(){
       <div style="background:#1a1a1a;border-radius:16px;padding:20px;margin-bottom:16px;border:1px solid #2a2a2a"><div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;gap:8px"><div><div style="font-size:18px;font-weight:800">${d.nombre} <span class="btn-copy" data-copy="${(d.nombre||"").toUpperCase().replace(/"/g,"&quot;")}" data-label="Nombre" style="cursor:pointer;font-size:14px;opacity:.6">📋</span></div>${d.rut?`<div style="color:#888;font-size:13px">RUT: ${d.rut} <span class="btn-copy" data-copy="${(d.rut||"").toUpperCase().replace(/"/g,"&quot;")}" data-label="RUT" style="cursor:pointer;opacity:.6">📋</span></div>`:""}</div>${badge(d.estado)}</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">${d.nDoc?`<span class="pill">📄 N° ${d.nDoc}</span>`:""}${d.tracking?`<span class="pill">🚚 ${d.tracking}</span>`:""}${ticketImgs.length?`<span class="pill">🧾 ${ticketImgs.length} ticket${ticketImgs.length>1?"s":""}</span>`:`<span class="pill">🧾 Sin ticket</span>`}</div><div class="row"><span class="lbl">Tipo</span><span class="val">${UP(d.tipoCompra==="importacion"?"🌏 Importación":d.tipoCompra==="mixto"?"🌏🇨🇱 Mixto (Importación + Nacional)":"🇨🇱 Compra nacional")}</span></div>${empresaLabel?`<div class="row"><span class="lbl">Empresa</span><span class="val">${UP(empresaLabel)}</span></div>`:""}<div class="row"><span class="lbl">Destino</span><span class="val">${UP(destinoLabel)}</span></div>${agenciaLabel?`<div class="row"><span class="lbl">Agencia</span><span class="val">${UP(agenciaLabel)} <span class="btn-copy" data-copy="${UP(agenciaLabel).replace(/"/g,"&quot;")}" data-label="Transporte" style="cursor:pointer;opacity:.6">📋</span></span></div>`:""}${d.direccionDestino?`<div class="row"><span class="lbl">Dirección</span><span class="val">${UP(d.direccionDestino)} <span class="btn-copy" data-copy="${UP(d.direccionDestino).replace(/"/g,"&quot;")}" data-label="Dirección" style="cursor:pointer;opacity:.6">📋</span></span></div>`:""}${d.region?`<div class="row"><span class="lbl">Región</span><span class="val">${UP(d.region)}</span></div>`:""}${d.bultos?`<div class="row"><span class="lbl">Bultos</span><span class="val">${UP(d.bultos)}</span></div>`:""}${d.telefono?`<div class="row"><span class="lbl">Teléfono</span><span class="val">${UP(d.telefono)} <span class="btn-copy" data-copy="${UP(d.telefono).replace(/"/g,"&quot;")}" data-label="Teléfono" style="cursor:pointer;opacity:.6">📋</span></span></div>`:""}${d.notas?`<div class="row"><span class="lbl">Notas</span><span class="val">${UP(d.notas)}</span></div>`:""}<div class="row"><span class="lbl">Ingresado</span><span class="val">${UP(d.fecha||"")}</span></div></div>
       <div style="font-size:13px;color:#aaa;font-weight:700;margin:16px 0 10px">DOCUMENTO ORIGINAL</div>
       ${docImg?`<div class="gallery"><div class="thumb" data-doc-open="1"><img src="${docImg}" alt="Documento" /><div class="thumb-label">Documento</div></div></div>`:cargandoImgs?`<div style="color:#777;font-size:13px;margin-bottom:16px">⏳ Cargando foto...</div>`:`<div style="color:#555;font-size:13px;margin-bottom:16px">Sin documento adjunto.</div>`}
-      ${(Array.isArray(d.productos)&&d.productos.length)?`<div style="font-size:13px;color:#aaa;font-weight:700;margin:16px 0 10px">⚠️ PRODUCTOS (VERIFICA EL CÓDIGO)</div><div style="margin-bottom:16px">${d.productos.map(p=>`<div style="background:#1a1a1a;border:1px solid #3b2400;border-radius:12px;padding:10px 14px;margin-bottom:8px"><div style="font-size:16px;font-weight:900;color:#ff8c00;letter-spacing:.5px">${p.codigo||"(sin código)"}</div>${p.descripcion?`<div style="font-size:12px;color:#bbb;margin-top:2px">${p.descripcion}</div>`:""}</div>`).join("")}</div>`:""}
+      ${(Array.isArray(d.productos)&&d.productos.length)?`<div style="font-size:13px;color:#aaa;font-weight:700;margin:16px 0 10px">⚠️ PRODUCTOS (VERIFICA EL CÓDIGO)</div><div style="margin-bottom:16px">${d.productos.map(p=>`<div style="background:#1a1a1a;border:1px solid #3b2400;border-radius:12px;padding:10px 14px;margin-bottom:8px"><div style="font-size:16px;font-weight:900;color:#ff8c00;letter-spacing:.5px">${p.codigo||"(sin código)"}${p.nacional?' <span title="Se retira en la compra nacional" style="font-size:13px">🏭</span>':""}</div>${p.descripcion?`<div style="font-size:12px;color:#bbb;margin-top:2px">${p.descripcion}</div>`:""}</div>`).join("")}</div>`:""}
+      ${(d.tipoCompra==="nacional"||d.tipoCompra==="mixto")&&d.estado==="pendiente"?`
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;color:${d.documentosListos?"#10b981":"#8a8f98"};cursor:pointer;background:${d.documentosListos?"#002a1a":"#1a1a1a"};border:1px solid ${d.documentosListos?"#10b981":"#333"};border-radius:12px;padding:10px 14px;margin:16px 0">
+        <input type="checkbox" id="chkDocumentosListos" ${d.documentosListos?"checked":""} style="accent-color:#10b981;width:17px;height:17px;cursor:pointer" />
+        📋 Etiqueta y factura impresas — a la espera del producto
+      </label>`:""}
       <div style="font-size:13px;color:#aaa;font-weight:700;margin:16px 0 10px">CAMBIAR ESTADO</div>
       ${Object.entries(ESTADOS).map(([k,v])=>`<button class="btn-estado" data-estado="${k}" data-fbkey="${d.fbKey||""}" style="color:${v.color};border-color:${d.estado===k?v.color:"#333"};background:${d.estado===k?v.bg:"#1a1a1a"}">${d.estado===k?'<span class="check-anim">✓</span> ':""}${v.label}</button>`).join("")}
       <div style="font-size:13px;color:#aaa;font-weight:700;margin:18px 0 10px">TRACKING</div>
@@ -1529,6 +1578,7 @@ function bindDetalle(){
   document.querySelectorAll("[data-ticket-open]").forEach(el=>{ const idx=+el.dataset.ticketOpen; el.onclick=()=>openImageOverlay(ticketImgs[idx]); });
   document.querySelectorAll(".btn-estado").forEach(btn=>{ btn.onclick=()=>{ const nuevoEstado=btn.dataset.estado; if(nuevoEstado==="entregado" && !ticketImgs.length){ const seguir=confirm("Este despacho se marcará como entregado sin ticket. ¿Continuar?"); if(!seguir) return; } dbEstado(state.selectedId,btn.dataset.fbkey,nuevoEstado); }; });
   const chkEnviadoDetalle=document.getElementById("chkTicketEnviadoDetalle"); if(chkEnviadoDetalle) chkEnviadoDetalle.onchange=(e)=>dbTicketEnviado(d.id,e.target.checked);
+  const chkDocListos=document.getElementById("chkDocumentosListos"); if(chkDocListos) chkDocListos.onchange=(e)=>dbDocumentosListos(d.id,e.target.checked);
   const btnGrande=document.getElementById("btnEnviarGrande"); if(btnGrande){ btnGrande.onclick=()=>compartirWhatsapp(d,btnGrande); }
   const btnWa=document.getElementById("btnWhatsapp"); if(btnWa){ btnWa.onclick=(e)=>{ e.preventDefault(); compartirWhatsapp(d,btnWa); }; }
   const btnDesc=document.getElementById("btnDescargarTodo"); if(btnDesc){ btnDesc.onclick=()=>{ if(ticketImgs.length){ const a=document.createElement("a"); a.href=ticketImgs[0]; a.download=filenameForTicket(d,0); a.click(); } else showToast("No hay ticket para descargar"); }; }
