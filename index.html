@@ -64,24 +64,42 @@
       --muted2:#6b7280;
       --accent:#e07b00;
       --accent2:#f59e0b;
+      --accent3:#ffb545;
       --ok:#10b981;
       --danger:#ef4444;
       --warn:#f59e0b;
       --shadow:0 10px 30px rgba(0,0,0,.25);
+      --shadow-lift:0 16px 40px rgba(0,0,0,.38);
+      --glow-accent:0 0 0 1px rgba(224,123,0,.18), 0 8px 24px rgba(224,123,0,.14);
     }
-    html,body{background:radial-gradient(circle at top,#161616 0%,#0b0b0c 28%,#09090a 100%);color:var(--text);min-height:100vh}
-    body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+    html,body{background:
+        radial-gradient(circle at 15% -10%,rgba(224,123,0,.10) 0%,transparent 45%),
+        radial-gradient(circle at 100% 0%,rgba(59,130,246,.06) 0%,transparent 40%),
+        radial-gradient(circle at top,#161616 0%,#0b0b0c 28%,#09090a 100%);
+      background-attachment:fixed;color:var(--text);min-height:100vh}
+    body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;-webkit-font-smoothing:antialiased;letter-spacing:.1px}
+    ::-webkit-scrollbar{width:10px;height:10px}
+    ::-webkit-scrollbar-track{background:transparent}
+    ::-webkit-scrollbar-thumb{background:#2a2a2e;border-radius:999px;border:2px solid #0b0b0c}
+    ::-webkit-scrollbar-thumb:hover{background:#3a3a40}
+    ::selection{background:rgba(224,123,0,.35);color:#fff}
     input,select,textarea,button{font-family:inherit}
     .header{
-      background:rgba(18,18,19,.9);
-      backdrop-filter:blur(10px);
-      border-bottom:1px solid rgba(255,255,255,.06);
+      background:rgba(15,15,17,.72);
+      backdrop-filter:blur(18px) saturate(140%);
+      -webkit-backdrop-filter:blur(18px) saturate(140%);
+      border-bottom:1px solid rgba(255,255,255,.07);
       padding:16px 18px;
       display:flex;align-items:center;justify-content:space-between;gap:12px;
-      position:sticky;top:0;z-index:30
+      position:sticky;top:0;z-index:30;
+      box-shadow:0 1px 0 rgba(255,255,255,.03), 0 12px 24px -12px rgba(0,0,0,.5)
     }
-    .brand-wrap{display:flex;flex-direction:column;gap:4px}
-    .brand-title{font-size:17px;font-weight:800;display:flex;align-items:center;gap:8px}
+    .header::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:1px;background:linear-gradient(90deg,transparent,rgba(224,123,0,.55),transparent)}
+    .header{position:sticky}
+    .brand-wrap{display:flex;flex-direction:column;gap:4px;position:relative}
+    .brand-title{font-size:17.5px;font-weight:800;display:flex;align-items:center;gap:10px;letter-spacing:-.01em}
+    .brand-icon{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:11px;font-size:17px;
+      background:linear-gradient(145deg,var(--accent),var(--accent2));box-shadow:var(--glow-accent), inset 0 1px 0 rgba(255,255,255,.25)}
     .brand-sub{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:8px}
     .header-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
     .install-banner{max-width:1180px;margin:12px auto 0;padding:12px 16px;border-radius:14px;border:1px solid rgba(16,185,129,.24);background:rgba(16,185,129,.08);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
@@ -93,12 +111,12 @@
       transition:transform .16s ease, opacity .16s ease, background .18s ease, border-color .18s ease, box-shadow .18s ease
     }
     .btn-main{
-      background:linear-gradient(135deg,var(--accent),var(--accent2));
-      color:#fff; box-shadow:0 10px 22px rgba(224,123,0,.22)
+      background:linear-gradient(160deg,var(--accent3) 0%,var(--accent) 55%,#c96800 100%);
+      color:#fff; box-shadow:0 12px 26px rgba(224,123,0,.28), inset 0 1px 0 rgba(255,255,255,.25)
     }
-    .btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff}
-    .btn-secondary{background:#1b1b1d;color:#fff;border:1px solid var(--line2)}
-    .btn-danger{background:#2a0000;color:#fff;border:1px solid #5a1a1a}
+    .btn-primary{background:linear-gradient(160deg,var(--accent3) 0%,var(--accent) 55%,#c96800 100%);color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.2), 0 8px 18px rgba(224,123,0,.18)}
+    .btn-secondary{background:rgba(255,255,255,.045);color:#fff;border:1px solid rgba(255,255,255,.09);backdrop-filter:blur(6px)}
+    .btn-danger{background:linear-gradient(160deg,#3a0d0d,#240000);color:#fff;border:1px solid #5a1a1a}
     .btn-ghost{background:none;color:#aaa;border:1px solid var(--line2)}
     .btn-back{background:none;border:none;color:#aaa;font-size:22px;cursor:pointer;padding:4px 8px}
     .btn-delete{background:none;border:none;color:var(--danger);font-size:20px;cursor:pointer}
@@ -107,33 +125,37 @@
       border:1px solid var(--line2);transition:.18s transform,.18s background,.18s border-color
     }
     .btn-primary:active,.btn-secondary:active,.btn-danger:active,.btn-ghost:active,.btn-main:active,.btn-estado:active,.card:active,.counter:active,.chip:active,.mini-card:active{transform:scale(.985)}
-    .btn-main:hover,.btn-primary:hover,.btn-secondary:hover{filter:brightness(1.05)}
+    .btn-main:hover,.btn-primary:hover{filter:brightness(1.08)}
+    .btn-secondary:hover{background:rgba(255,255,255,.075);border-color:rgba(255,255,255,.16)}
     .field{margin-bottom:14px}
     .field label{font-size:12px;color:var(--muted);display:block;margin-bottom:5px}
     .field input,.field select,.field textarea{
-      width:100%;background:#1e1e22;border:1px solid var(--line2);border-radius:14px;padding:12px 13px;color:#fff;font-size:15px;outline:none
+      width:100%;background:#1c1c20;border:1px solid var(--line2);border-radius:14px;padding:12px 13px;color:#fff;font-size:15px;outline:none;transition:.16s border-color,.16s box-shadow,.16s background
     }
+    .field input:hover,.field select:hover,.field textarea:hover{border-color:#454550}
     .field textarea{resize:none}
     .field input::placeholder,.field textarea::placeholder{color:#555}
-    .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(224,123,0,.12)}
+    .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(224,123,0,.14);background:#1f1f24}
     .card,.mini-card,.dashboard-card,.search-shell,.section-card{
-      background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.02));
-      border-radius:18px;border:1px solid rgba(255,255,255,.07);box-shadow:var(--shadow)
+      background:linear-gradient(165deg,rgba(255,255,255,.045),rgba(255,255,255,.015));
+      border-radius:18px;border:1px solid rgba(255,255,255,.08);box-shadow:var(--shadow)
     }
-    .card{padding:16px;cursor:pointer;margin-bottom:12px;transition:.18s transform,.18s border-color,.18s background,.18s box-shadow}
-    .card:hover{border-color:rgba(224,123,0,.35);box-shadow:0 14px 28px rgba(0,0,0,.28)}
+    .card{padding:16px;cursor:pointer;margin-bottom:12px;transition:.2s transform,.2s border-color,.2s background,.2s box-shadow}
+    .card:hover{border-color:rgba(224,123,0,.4);box-shadow:var(--shadow-lift);transform:translateY(-2px)}
     .mini-card{padding:12px}
     .dashboard-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding:18px 16px 0;max-width:1180px;margin:0 auto}
-    .dashboard-card{padding:16px 14px;text-align:left;position:relative;overflow:hidden}
+    .dashboard-card{padding:16px 14px;text-align:left;position:relative;overflow:hidden;transition:.2s transform,.2s box-shadow}
+    .dashboard-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-lift)}
+    .dashboard-card::before{content:"";position:absolute;left:0;top:0;right:0;height:2px;background:linear-gradient(90deg,transparent,rgba(224,123,0,.55),transparent);opacity:.8}
     .dashboard-card::after{content:"";position:absolute;inset:auto -18px -18px auto;width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,.03)}
-    .dashboard-num{font-size:30px;font-weight:900;line-height:1}
+    .dashboard-num{font-size:31px;font-weight:900;line-height:1;letter-spacing:-.02em}
     .dashboard-lbl{font-size:12px;color:var(--muted);margin-top:8px;font-weight:700;letter-spacing:.2px}
     .dashboard-hint{font-size:11px;color:#5f6368;margin-top:6px}
     .counters{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;padding:14px 16px 0;max-width:1180px;margin:0 auto}
     .counter{border-radius:18px;padding:14px 10px;text-align:center;cursor:pointer;border:1px solid rgba(255,255,255,.07);background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.02));transition:.18s transform,.18s border-color,.18s box-shadow;box-shadow:var(--shadow)}
     .counter .num{font-size:26px;font-weight:900}
     .counter .lbl{font-size:11px;color:var(--muted);margin-top:4px;font-weight:700}
-    .badge{border-radius:999px;padding:5px 12px;font-size:12px;font-weight:800;border:1px solid;white-space:nowrap;animation:badgePop .4s cubic-bezier(.34,1.56,.64,1)}
+    .badge{border-radius:999px;padding:5px 12px;font-size:12px;font-weight:800;border:1px solid;white-space:nowrap;animation:badgePop .4s cubic-bezier(.34,1.56,.64,1);box-shadow:0 2px 8px rgba(0,0,0,.25)}
     @keyframes badgePop{0%{opacity:0;transform:scale(.6)}70%{transform:scale(1.12)}100%{opacity:1;transform:scale(1)}}
     .check-anim{display:inline-block;animation:checkPop .45s cubic-bezier(.34,1.56,.64,1)}
     @keyframes checkPop{0%{transform:scale(0) rotate(-20deg);opacity:0}60%{transform:scale(1.3) rotate(8deg)}100%{transform:scale(1) rotate(0);opacity:1}}
@@ -144,7 +166,8 @@
     .empty{text-align:center;color:#555;padding:50px 0;font-size:15px}
     .tabs{display:flex;gap:8px;margin-bottom:16px}
     .tab{flex:1;padding:11px 6px;border-radius:14px;border:1px solid var(--line2);background:#151518;color:var(--muted);font-size:13px;font-weight:700;cursor:pointer;text-align:center;transition:all .2s}
-    .tab.active{border-color:var(--accent);color:var(--accent);background:#2a1f00;box-shadow:0 0 0 3px rgba(224,123,0,.1) inset}
+    .tab:hover{border-color:rgba(255,255,255,.18);color:#ddd}
+    .tab.active{border-color:var(--accent);color:#ffcf8a;background:linear-gradient(160deg,#2e2000,#241900);box-shadow:0 0 0 3px rgba(224,123,0,.12) inset, 0 4px 14px rgba(224,123,0,.12)}
     .upload-area{border:2px dashed #333;border-radius:18px;padding:22px;text-align:center;cursor:pointer;background:#151518;margin-bottom:14px;transition:.18s border-color,.18s background,.18s transform}
     .upload-area.dragover{border-color:var(--accent);background:#21180a;transform:scale(1.02);animation:dragPulse 1s ease-in-out infinite}
     @keyframes dragPulse{0%,100%{box-shadow:0 0 0 0 rgba(224,123,0,.35)}50%{box-shadow:0 0 0 10px rgba(224,123,0,0)}}
@@ -162,8 +185,9 @@
     .filters-wrap{max-width:1180px;margin:0 auto;padding:14px 16px 0}
     .search-shell{padding:12px}
     .chips{display:flex;gap:8px;flex-wrap:wrap}
-    .chip{background:#18181c;border:1px solid var(--line2);color:var(--muted);border-radius:999px;padding:9px 14px;font-size:12px;font-weight:800;cursor:pointer;transition:.18s transform,.18s border-color,.18s background}
-    .chip.active{background:#2a1f00;border-color:var(--accent);color:var(--accent2)}
+    .chip{background:rgba(255,255,255,.04);border:1px solid var(--line2);color:var(--muted);border-radius:999px;padding:9px 14px;font-size:12px;font-weight:800;cursor:pointer;transition:.18s transform,.18s border-color,.18s background,.18s color}
+    .chip:hover{border-color:rgba(255,255,255,.22);color:#ddd}
+    .chip.active{background:linear-gradient(160deg,#2e2000,#241900);border-color:var(--accent);color:var(--accent3);box-shadow:0 2px 10px rgba(224,123,0,.15)}
     .layout{display:flex;gap:16px;align-items:flex-start;max-width:1180px;margin:0 auto;padding:16px}
     .layout-main{flex:1;min-width:0}
     .layout-side{width:240px;flex-shrink:0;display:flex;flex-direction:column;gap:12px}
@@ -192,7 +216,8 @@
     .list-card-top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
     .client-title{font-size:18px;font-weight:900;line-height:1.15;letter-spacing:-.02em;margin-bottom:8px}
     .meta-line{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:#8d95a1}
-    .meta-pill{display:inline-flex;align-items:center;gap:6px;background:#121316;border:1px solid rgba(255,255,255,.06);padding:6px 10px;border-radius:999px}
+    .meta-pill{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.08);padding:6px 10px;border-radius:999px;transition:.16s border-color}
+    .meta-pill:hover{border-color:rgba(255,255,255,.18)}
     .list-card-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 18px;margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.06)}
     .info-row{display:flex;align-items:flex-start;gap:8px;font-size:14px;color:#d5d7db}
     .info-label{font-size:12px;color:#79808a;margin-bottom:2px;font-weight:700}
@@ -538,20 +563,37 @@ function getAgencyLabel(d){
 }
 function getEmpresaLabel(d){ return d.empresaNacional==="Otra..."?(d.empresaNacionalCustom||"Otra"):d.empresaNacional; }
 
-// Junta, por empresa proveedora, qué hay que ir a retirar (solo despachos aún "pendiente" de compra nacional/mixta)
-// Agrupa por DESPACHO (no por producto suelto) para poder marcar "etiqueta y factura listas" una sola vez por cliente.
+// A qué empresa hay que ir a buscar ESTE producto en particular (puede variar producto a producto)
+function empresaDeProducto(d,p){
+  if(p.empresa) return p.empresa==="Otra..."?(p.empresaCustom||"Otra"):p.empresa;
+  if(p.nacional) return getEmpresaLabel(d)||"Empresa sin especificar"; // dato antiguo (check 🏭 sin proveedor propio)
+  if(d.tipoCompra==="nacional") return getEmpresaLabel(d)||"Empresa sin especificar"; // despacho 100% de un solo proveedor
+  return null; // mixto sin marcar: no sabemos a cuál proveedor pertenece
+}
+
+// Junta, por empresa proveedora, qué hay que ir a retirar (solo despachos "pendiente" de compra nacional/mixta).
+// Un mismo despacho puede aparecer bajo MÁS DE UNA empresa si sus productos se retiran en lugares distintos.
 function retirosNacionalPorEmpresa(){
   const pendientes=state.despachos.filter(d=>d.estado==="pendiente" && (d.tipoCompra==="nacional"||d.tipoCompra==="mixto"));
   const grupos={};
-  pendientes.forEach(d=>{
-    const empresa=getEmpresaLabel(d)||"Empresa sin especificar";
-    const marcados=(Array.isArray(d.productos)?d.productos:[]).filter(p=>p.nacional);
-    const items=marcados.length?marcados:(d.tipoCompra==="nacional"?(d.productos||[]):[]);
-    const textos=items.length
-      ? items.map(p=>p.codigo?`${p.codigo}${p.descripcion?" — "+p.descripcion:""}`:(p.descripcion||"Producto sin código"))
-      : ["Revisar productos del despacho (mixto, sin marcar)"];
+  const agregar=(empresa,id,cliente,documentosListos,texto)=>{
     grupos[empresa]=grupos[empresa]||[];
-    grupos[empresa].push({id:d.id,cliente:d.nombre,documentosListos:!!d.documentosListos,items:textos});
+    let entrada=grupos[empresa].find(x=>x.id===id);
+    if(!entrada){ entrada={id,cliente,documentosListos,items:[]}; grupos[empresa].push(entrada); }
+    entrada.items.push(texto);
+  };
+  pendientes.forEach(d=>{
+    const productos=Array.isArray(d.productos)?d.productos:[];
+    productos.forEach(p=>{
+      const empresa=empresaDeProducto(d,p);
+      if(!empresa) return;
+      const texto=p.codigo?`${p.codigo}${p.descripcion?" — "+p.descripcion:""}`:(p.descripcion||"Producto sin código");
+      agregar(empresa,d.id,d.nombre,!!d.documentosListos,texto);
+    });
+    const sinAsignar = d.tipoCompra==="mixto" ? productos.filter(p=>!empresaDeProducto(d,p)) : (productos.length?[]:[null]);
+    if(sinAsignar.length){
+      agregar(getEmpresaLabel(d)||"Empresa sin especificar",d.id,d.nombre,!!d.documentosListos,"Revisar productos del despacho (sin proveedor asignado)");
+    }
   });
   return grupos;
 }
@@ -1193,7 +1235,7 @@ function renderLista(){
   return `
     <div class="header">
       <div class="brand-wrap">
-        <div class="brand-title">📦 Despachos Colderman</div>
+        <div class="brand-title"><span class="brand-icon">📦</span> Despachos Colderman</div>
         <div class="brand-sub">${state.despachos.length} total · ${state.useFirebase?"🔄 sincronizado":"local"}</div>
       </div>
       <div class="header-actions">
@@ -1342,7 +1384,13 @@ function renderNuevo(){
         <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center" data-prod-row="${idx}">
           <input class="prod-codigo" data-idx="${idx}" value="${p.codigo||""}" placeholder="Código (ej: CMP-7958)" style="width:160px;font-weight:800;color:#ff8c00" />
           <input class="prod-desc" data-idx="${idx}" value="${p.descripcion||""}" placeholder="Descripción" style="flex:1" />
-          ${isNacional?`<label title="Se retira en la compra nacional (${f.empresaNacional==="Otra..."?(f.empresaNacionalCustom||"Otra"):(f.empresaNacional||"la empresa elegida arriba")})" style="display:flex;align-items:center;gap:4px;font-size:16px;flex-shrink:0;cursor:pointer;background:${p.nacional?"#3b2400":"transparent"};border:1px solid ${p.nacional?"#e07b00":"#333"};border-radius:8px;padding:6px 8px"><input type="checkbox" class="prod-nacional" data-idx="${idx}" ${p.nacional?"checked":""} style="accent-color:#e07b00;width:15px;height:15px;cursor:pointer;margin:0" />🏭</label>`:""}
+          ${isNacional?`
+            <select class="prod-empresa" data-idx="${idx}" title="¿Dónde se retira este producto?" style="font-size:11px;font-weight:700;background:#1a1a1a;border:1px solid ${p.empresa?"#e07b00":"#333"};border-radius:8px;color:${p.empresa?"#ff8c00":"#888"};padding:0 6px;height:38px;max-width:104px;flex-shrink:0">
+              <option value="">${f.tipoCompra==="nacional"?"↳ de arriba":"🏭 no aplica"}</option>
+              ${EMPRESAS_NACIONAL.map(e=>`<option value="${e}" ${p.empresa===e?"selected":""}>${e}</option>`).join("")}
+            </select>
+            ${p.empresa==="Otra..."?`<input class="prod-empresa-custom" data-idx="${idx}" value="${p.empresaCustom||""}" placeholder="¿Cuál?" style="width:74px;font-size:11px;flex-shrink:0" />`:""}
+          `:""}
           <button type="button" class="btn-delete prod-remove" data-idx="${idx}" style="flex-shrink:0">🗑</button>
         </div>`).join("")}</div>
       <button type="button" id="btnAgregarProducto" class="btn-secondary" style="margin-bottom:14px">➕ Agregar producto</button>
@@ -1350,7 +1398,7 @@ function renderNuevo(){
       <div class="section-sep">Tipo de compra</div>
       <div class="tabs"><div class="tab ${f.tipoCompra==="importacion"?"active":""}" id="tabImport">🌏 Importación</div><div class="tab ${f.tipoCompra==="nacional"?"active":""}" id="tabNacional">🇨🇱 Compra nacional</div><div class="tab ${f.tipoCompra==="mixto"?"active":""}" id="tabMixto">🌏🇨🇱 Mixto</div></div>
       ${(f.tipoCompra==="nacional"||f.tipoCompra==="mixto")?`<div class="field"><label>Empresa proveedora (parte nacional)</label><select id="fEmpresaNacional"><option value="">Seleccionar empresa...</option>${EMPRESAS_NACIONAL.map(e=>`<option ${f.empresaNacional===e?"selected":""}>${e}</option>`).join("")}</select></div>${showEmpresaCustom?`<div class="field"><label>¿Cuál empresa?</label><input id="fEmpresaCustom" value="${f.empresaNacionalCustom||""}" placeholder="Nombre de la empresa" /></div>`:""}`:""}
-      ${f.tipoCompra==="mixto"?`<div style="background:#1a1a1a;border-radius:12px;padding:12px;margin-bottom:14px;font-size:12px;color:#ff8c00">💡 Marca con el ícono 🏭 en la lista de productos de arriba cuáles se retiran en la compra nacional.</div>`:""}
+      ${f.tipoCompra==="mixto"?`<div style="background:#1a1a1a;border-radius:12px;padding:12px;margin-bottom:14px;font-size:12px;color:#ff8c00">💡 En cada producto de arriba, elige en el selector 🏭 dónde se retira (pueden ser proveedores distintos). Los que no apliquen, déjalos en "no aplica".</div>`:""}
       <div class="section-sep">Destino del envío</div>
       <div class="tabs"><div class="tab ${isProvincia?"active":""}" id="tabProvincia">📦 Región</div><div class="tab ${f.destino==="oficina"?"active":""}" id="tabOficina">🏢 Oficina</div><div class="tab ${f.destino==="bodega"?"active":""}" id="tabBodega">🏭 Bodega</div></div>
       ${isProvincia?`<div class="field"><label>Agencia de envío</label><select id="fAgencia"><option value="">Seleccionar agencia...</option>${AGENCIAS.map(a=>`<option ${f.agencia===a?"selected":""}>${a}</option>`).join("")}</select></div>${showAgenciaCustom?`<div class="field"><label>¿Cuál agencia?</label><input id="fAgenciaCustom" value="${f.agenciaCustom||""}" placeholder="Nombre de la agencia" /></div>`:""}<div class="field"><label>Dirección / sucursal de destino</label><input id="fDireccion" value="${f.direccionDestino||""}" placeholder="Ej: Sucursal Starken Talca, Av. O'Higgins 123" /></div>`:`<div style="background:#1a1a1a;border-radius:12px;padding:12px;margin-bottom:14px;font-size:13px;color:#888">${f.destino==="oficina"?"🏢 El pedido se recibe en oficina.":"🏭 El pedido se recoge en bodega."}</div>`}
@@ -1491,9 +1539,10 @@ function bindNuevo(){
   const fno=document.getElementById("fNotas"); if(fno) fno.oninput=e=>{state.form.notas=e.target.value;};
   document.querySelectorAll(".prod-codigo").forEach(inp=>{ inp.oninput=e=>{ const idx=+inp.dataset.idx; state.form.productos[idx]=state.form.productos[idx]||{}; state.form.productos[idx].codigo=e.target.value; }; });
   document.querySelectorAll(".prod-desc").forEach(inp=>{ inp.oninput=e=>{ const idx=+inp.dataset.idx; state.form.productos[idx]=state.form.productos[idx]||{}; state.form.productos[idx].descripcion=e.target.value; }; });
-  document.querySelectorAll(".prod-nacional").forEach(inp=>{ inp.onchange=e=>{ const idx=+inp.dataset.idx; state.form.productos[idx]=state.form.productos[idx]||{}; state.form.productos[idx].nacional=inp.checked; e.target.closest("label").style.background=inp.checked?"#3b2400":"transparent"; e.target.closest("label").style.borderColor=inp.checked?"#e07b00":"#333"; }; });
+  document.querySelectorAll(".prod-empresa").forEach(sel=>{ sel.onchange=e=>{ const idx=+sel.dataset.idx; state.form.productos[idx]=state.form.productos[idx]||{}; state.form.productos[idx].empresa=sel.value; if(sel.value!=="Otra...") delete state.form.productos[idx].empresaCustom; re(); }; });
+  document.querySelectorAll(".prod-empresa-custom").forEach(inp=>{ inp.oninput=e=>{ const idx=+inp.dataset.idx; state.form.productos[idx]=state.form.productos[idx]||{}; state.form.productos[idx].empresaCustom=e.target.value; }; });
   document.querySelectorAll(".prod-remove").forEach(btn=>{ btn.onclick=()=>{ const idx=+btn.dataset.idx; state.form.productos.splice(idx,1); re(); }; });
-  const btnAgregarProducto=document.getElementById("btnAgregarProducto"); if(btnAgregarProducto) btnAgregarProducto.onclick=()=>{ state.form.productos=[...(state.form.productos||[]),{codigo:"",descripcion:"",nacional:state.form.tipoCompra==="nacional"}]; re(); };
+  const btnAgregarProducto=document.getElementById("btnAgregarProducto"); if(btnAgregarProducto) btnAgregarProducto.onclick=()=>{ state.form.productos=[...(state.form.productos||[]),{codigo:"",descripcion:"",empresa:""}]; re(); };
   document.getElementById("btnGuardar").onclick=guardar;
 }
 
@@ -1514,7 +1563,7 @@ function renderDetalle(){
       <div style="background:#1a1a1a;border-radius:16px;padding:20px;margin-bottom:16px;border:1px solid #2a2a2a"><div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;gap:8px"><div><div style="font-size:18px;font-weight:800">${d.nombre} <span class="btn-copy" data-copy="${(d.nombre||"").toUpperCase().replace(/"/g,"&quot;")}" data-label="Nombre" style="cursor:pointer;font-size:14px;opacity:.6">📋</span></div>${d.rut?`<div style="color:#888;font-size:13px">RUT: ${d.rut} <span class="btn-copy" data-copy="${(d.rut||"").toUpperCase().replace(/"/g,"&quot;")}" data-label="RUT" style="cursor:pointer;opacity:.6">📋</span></div>`:""}</div>${badge(d.estado)}</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">${d.nDoc?`<span class="pill">📄 N° ${d.nDoc}</span>`:""}${d.tracking?`<span class="pill">🚚 ${d.tracking}</span>`:""}${ticketImgs.length?`<span class="pill">🧾 ${ticketImgs.length} ticket${ticketImgs.length>1?"s":""}</span>`:`<span class="pill">🧾 Sin ticket</span>`}</div><div class="row"><span class="lbl">Tipo</span><span class="val">${UP(d.tipoCompra==="importacion"?"🌏 Importación":d.tipoCompra==="mixto"?"🌏🇨🇱 Mixto (Importación + Nacional)":"🇨🇱 Compra nacional")}</span></div>${empresaLabel?`<div class="row"><span class="lbl">Empresa</span><span class="val">${UP(empresaLabel)}</span></div>`:""}<div class="row"><span class="lbl">Destino</span><span class="val">${UP(destinoLabel)}</span></div>${agenciaLabel?`<div class="row"><span class="lbl">Agencia</span><span class="val">${UP(agenciaLabel)} <span class="btn-copy" data-copy="${UP(agenciaLabel).replace(/"/g,"&quot;")}" data-label="Transporte" style="cursor:pointer;opacity:.6">📋</span></span></div>`:""}${d.direccionDestino?`<div class="row"><span class="lbl">Dirección</span><span class="val">${UP(d.direccionDestino)} <span class="btn-copy" data-copy="${UP(d.direccionDestino).replace(/"/g,"&quot;")}" data-label="Dirección" style="cursor:pointer;opacity:.6">📋</span></span></div>`:""}${d.region?`<div class="row"><span class="lbl">Región</span><span class="val">${UP(d.region)}</span></div>`:""}${d.bultos?`<div class="row"><span class="lbl">Bultos</span><span class="val">${UP(d.bultos)}</span></div>`:""}${d.telefono?`<div class="row"><span class="lbl">Teléfono</span><span class="val">${UP(d.telefono)} <span class="btn-copy" data-copy="${UP(d.telefono).replace(/"/g,"&quot;")}" data-label="Teléfono" style="cursor:pointer;opacity:.6">📋</span></span></div>`:""}${d.notas?`<div class="row"><span class="lbl">Notas</span><span class="val">${UP(d.notas)}</span></div>`:""}<div class="row"><span class="lbl">Ingresado</span><span class="val">${UP(d.fecha||"")}</span></div></div>
       <div style="font-size:13px;color:#aaa;font-weight:700;margin:16px 0 10px">DOCUMENTO ORIGINAL</div>
       ${docImg?`<div class="gallery"><div class="thumb" data-doc-open="1"><img src="${docImg}" alt="Documento" /><div class="thumb-label">Documento</div></div></div>`:cargandoImgs?`<div style="color:#777;font-size:13px;margin-bottom:16px">⏳ Cargando foto...</div>`:`<div style="color:#555;font-size:13px;margin-bottom:16px">Sin documento adjunto.</div>`}
-      ${(Array.isArray(d.productos)&&d.productos.length)?`<div style="font-size:13px;color:#aaa;font-weight:700;margin:16px 0 10px">⚠️ PRODUCTOS (VERIFICA EL CÓDIGO)</div><div style="margin-bottom:16px">${d.productos.map(p=>`<div style="background:#1a1a1a;border:1px solid #3b2400;border-radius:12px;padding:10px 14px;margin-bottom:8px"><div style="font-size:16px;font-weight:900;color:#ff8c00;letter-spacing:.5px">${p.codigo||"(sin código)"}${p.nacional?' <span title="Se retira en la compra nacional" style="font-size:13px">🏭</span>':""}</div>${p.descripcion?`<div style="font-size:12px;color:#bbb;margin-top:2px">${p.descripcion}</div>`:""}</div>`).join("")}</div>`:""}
+      ${(Array.isArray(d.productos)&&d.productos.length)?`<div style="font-size:13px;color:#aaa;font-weight:700;margin:16px 0 10px">⚠️ PRODUCTOS (VERIFICA EL CÓDIGO)</div><div style="margin-bottom:16px">${d.productos.map(p=>`<div style="background:#1a1a1a;border:1px solid #3b2400;border-radius:12px;padding:10px 14px;margin-bottom:8px"><div style="font-size:16px;font-weight:900;color:#ff8c00;letter-spacing:.5px">${p.codigo||"(sin código)"}${empresaDeProducto(d,p)?` <span style="font-size:11px;font-weight:800;color:#ccc;background:#111;border:1px solid #3b2400;border-radius:999px;padding:2px 8px;vertical-align:middle">🏭 ${empresaDeProducto(d,p)}</span>`:""}</div>${p.descripcion?`<div style="font-size:12px;color:#bbb;margin-top:2px">${p.descripcion}</div>`:""}</div>`).join("")}</div>`:""}
       ${(d.tipoCompra==="nacional"||d.tipoCompra==="mixto")&&d.estado==="pendiente"?`
       <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;color:${d.documentosListos?"#10b981":"#8a8f98"};cursor:pointer;background:${d.documentosListos?"#002a1a":"#1a1a1a"};border:1px solid ${d.documentosListos?"#10b981":"#333"};border-radius:12px;padding:10px 14px;margin:16px 0">
         <input type="checkbox" id="chkDocumentosListos" ${d.documentosListos?"checked":""} style="accent-color:#10b981;width:17px;height:17px;cursor:pointer" />
