@@ -136,6 +136,17 @@
     .field textarea{resize:none}
     .field input::placeholder,.field textarea::placeholder{color:#555}
     .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(224,123,0,.14);background:#1f1f24}
+    /* Evita que el autocompletado del navegador (Android/Chrome) pinte el texto invisible sobre fondo oscuro */
+    .field input:-webkit-autofill,
+    .field input:-webkit-autofill:hover,
+    .field input:-webkit-autofill:focus,
+    .field input:-webkit-autofill:active{
+      -webkit-text-fill-color:#fff !important;
+      caret-color:#fff !important;
+      -webkit-box-shadow:0 0 0 1000px #1c1c20 inset !important;
+      box-shadow:0 0 0 1000px #1c1c20 inset !important;
+      transition:background-color 9999s ease-in-out 0s;
+    }
     .card,.mini-card,.dashboard-card,.search-shell,.section-card{
       background:linear-gradient(165deg,rgba(255,255,255,.045),rgba(255,255,255,.015));
       border-radius:18px;border:1px solid rgba(255,255,255,.08);box-shadow:var(--shadow)
@@ -1376,8 +1387,8 @@ function renderNuevo(){
       ${f.extracting?`<div class="extracting"><span class="spinner"></span>${f.statusMessage||"Extrayendo datos..."}</div>`:""}
       ${f.extractSuccess?`<div class="extract-ok">${f.extractSuccess}</div>`:""}
       ${f.extractError?`<div class="extract-error">${f.extractError}</div>`:""}
-      <div class="field"><label>Nombre del cliente / empresa *</label><div style="display:flex;gap:8px"><input id="fNombre" value="${f.nombre||""}" placeholder="Extraído o escribe aquí" style="flex:1" /><button type="button" id="btnBuscarBsale" class="btn-secondary" style="white-space:nowrap;flex-shrink:0">🔍 Bsale</button></div><div id="bsaleResultados"></div></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div class="field"><label>RUT</label><input id="fRut" value="${f.rut||""}" placeholder="Ej: 12.345.678-9" /></div><div class="field"><label>N° Cotización / Factura / Boleta</label><input id="fNDoc" value="${f.nDoc||""}" placeholder="Ej: 5065" /></div></div>
+      <div class="field"><label>Nombre del cliente / empresa *</label><div style="display:flex;gap:8px"><input id="fNombre" value="${f.nombre||""}" placeholder="Extraído o escribe aquí" style="flex:1" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" /><button type="button" id="btnBuscarBsale" class="btn-secondary" style="white-space:nowrap;flex-shrink:0">🔍 Bsale</button></div><div id="bsaleResultados"></div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div class="field"><label>RUT</label><input id="fRut" value="${f.rut||""}" placeholder="Ej: 12.345.678-9" autocomplete="off" /></div><div class="field"><label>N° Cotización / Factura / Boleta</label><input id="fNDoc" value="${f.nDoc||""}" placeholder="Ej: 5065" autocomplete="off" /></div></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div class="field"><label>Cantidad de bultos</label><input id="fBultos" type="number" min="1" value="${f.bultos||""}" placeholder="Ej: 3" /></div><div class="field"><label>Tracking</label><input id="fTracking" value="${f.tracking||""}" placeholder="Opcional / si ya lo tienes" /></div></div>
       <div class="section-sep">⚠️ Productos (verifica el código con cuidado)</div>
       <div id="productosList">${(f.productos||[]).map((p,idx)=>`
@@ -1394,7 +1405,7 @@ function renderNuevo(){
           <button type="button" class="btn-delete prod-remove" data-idx="${idx}" style="flex-shrink:0">🗑</button>
         </div>`).join("")}</div>
       <button type="button" id="btnAgregarProducto" class="btn-secondary" style="margin-bottom:14px">➕ Agregar producto</button>
-      <div class="field"><label>Teléfono</label><input id="fTelefono" value="${f.telefono||""}" placeholder="Ej: +56 9 1234 5678" /></div>
+      <div class="field"><label>Teléfono</label><input id="fTelefono" value="${f.telefono||""}" placeholder="Ej: +56 9 1234 5678" autocomplete="off" /></div>
       <div class="section-sep">Tipo de compra</div>
       <div class="tabs"><div class="tab ${f.tipoCompra==="importacion"?"active":""}" id="tabImport">🌏 Importación</div><div class="tab ${f.tipoCompra==="nacional"?"active":""}" id="tabNacional">🇨🇱 Compra nacional</div><div class="tab ${f.tipoCompra==="mixto"?"active":""}" id="tabMixto">🌏🇨🇱 Mixto</div></div>
       ${(f.tipoCompra==="nacional"||f.tipoCompra==="mixto")?`<div class="field"><label>Empresa proveedora (parte nacional)</label><select id="fEmpresaNacional"><option value="">Seleccionar empresa...</option>${EMPRESAS_NACIONAL.map(e=>`<option ${f.empresaNacional===e?"selected":""}>${e}</option>`).join("")}</select></div>${showEmpresaCustom?`<div class="field"><label>¿Cuál empresa?</label><input id="fEmpresaCustom" value="${f.empresaNacionalCustom||""}" placeholder="Nombre de la empresa" /></div>`:""}`:""}
