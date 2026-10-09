@@ -1088,7 +1088,43 @@ function loadPdfJs(){
   return _pdfjsLoadPromise;
 }
 
-// Convierte la primera página de un PDF en una imagen (para poder mostrarla y leerla con OCR igual que una foto)
+// Extrae el texto real incrustado en el PDF (cuando es una factura/cotización digital, no una foto escaneada).
+// Esto es MUCHO más confiable que el OCR, porque lee el texto exacto en vez de "adivinarlo" de una imagen.
+async function pdfExtraerTexto(file){
+  await loadPdfJs();
+  const arrayBuffer=await file.arrayBuffer();
+  const pdf=await window.pdfjsLib.getDocument({data:arrayBuffer}).promise;
+  const page=await pdf.getPage(1);
+  const content=await page.getTextContent();
+  // OJO: el orden en que pdf.js entrega los fragmentos de texto es el orden en que fueron
+  // DIBUJADOS en el PDF, no necesariamente el orden visual de arriba hacia abajo. En facturas
+  // tipo formulario (como las de Bsale) es común que primero se dibujen todos los VALORES
+  // (nombre, RUT, etc.) y recién después, por separado, todas las ETIQUETAS ("RUT:", "SEÑOR:"),
+  // aunque visualmente una etiqueta y su valor estén en la misma línea. Si armamos las líneas
+  // respetando ese orden "de dibujo", una etiqueta termina separada de su valor y la extracción
+  // falla. Por eso primero ordenamos todos los fragmentos por posición real en la página
+  // (de arriba hacia abajo, y dentro de cada fila de izquierda a derecha) y recién ahí armamos
+  // las líneas — así una etiqueta y su valor quedan juntos como en la factura impresa.
+  const items=content.items.filter(it=>it.str && it.str.trim()).map(it=>({
+    str:it.str, x:it.transform[4], y:it.transform[5]
+  }));
+  items.sort((a,b)=> (b.y-a.y) || (a.x-b.x));
+  const lines=[];
+  let currentY=null, currentLine=[];
+  for(const item of items){
+    if(currentY===null || Math.abs(item.y-currentY)>2){
+      if(currentLine.length) lines.push(currentLine.join(" "));
+      currentLine=[item.str];
+      currentY=item.y;
+    }else{
+      currentLine.push(item.str);
+    }
+  }
+  if(currentLine.length) lines.push(currentLine.join(" "));
+  return lines.join("\n");
+}
+
+// Convierte la primera página de un PDF en una imagen (para poder mostrarla y, si hace falta, leerla con OCR igual que una foto)
 async function pdfPrimeraPaginaABlob(file){
   await loadPdfJs();
   const arrayBuffer=await file.arrayBuffer();
@@ -1106,8 +1142,15 @@ async function pdfPrimeraPaginaABlob(file){
 
 async function handleFile(file){
   if(!file) return;
+  let textoPdfDirecto="";
   if(file.type==="application/pdf"){
-    state.form.extractError=""; state.form.extractSuccess=""; state.form.extracting=true; state.form.statusMessage="Convirtiendo PDF..."; render(); setTimeout(bindNuevo,0);
+    state.form.extractError=""; state.form.extractSuccess=""; state.form.extracting=true; state.form.statusMessage="Leyendo PDF..."; render(); setTimeout(bindNuevo,0);
+    // Si el PDF es una factura/cotización digital (no una foto escaneada), trae el texto exacto
+    // incrustado en el archivo. Esto evita por completo los errores de OCR en los códigos de producto.
+    try{
+      textoPdfDirecto=await pdfExtraerTexto(file);
+    }catch(err){ console.error("No se pudo extraer texto directo del PDF, se usará OCR",err); }
+    state.form.statusMessage="Convirtiendo PDF..."; render();
     try{
       file=await pdfPrimeraPaginaABlob(file);
     }catch(err){
@@ -1123,7 +1166,8 @@ async function handleFile(file){
   reader.onload=async e=>{
     state.form.imgPreview=e.target.result; render(); setTimeout(bindNuevo,0);
     try{
-      const text=await ocrImage(file,"spa");
+      // Si ya tenemos texto confiable extraído directo del PDF, lo usamos en vez del OCR.
+      const text=(textoPdfDirecto && textoPdfDirecto.trim().length>40) ? textoPdfDirecto : await ocrImage(file,"spa");
       const lines=text.split("\n").map(l=>l.trim()).filter(Boolean);
       const nombre=inferNombre(lines,text), rut=inferRut(text,lines), nDoc=inferDocNumber(text);
       const telefono=inferTelefono(text,lines);
