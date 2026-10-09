@@ -424,6 +424,10 @@ function sanitizeName(v){
     .trim();
 }
 
+// Etiquetas de otros campos que pueden quedar pegadas en la misma línea reconstruida que el
+// nombre (ej. "SEÑOR: CLIMA OK SPA FECHA EMISIÓN: 09/10/2026" cuando el PDF tiene dos columnas
+// a la misma altura). Si aparece una de estas después del nombre, cortamos ahí.
+const SIGUIENTE_ETIQUETA_RE=/\b(FECHA\s+EMISI[OÓ]N|FECHA\s+VENCIMIENTO|GIRO|DIRECCI[OÓ]N|COMUNA|CIUDAD|FORMA\s+DE\s+PAGO|TEL[EÉ]FONO|CELULAR|WHATSAPP|MAIL|CORREO|RUT|N[º°O]\b|SUCURSAL)\s*:/i;
 function inferNombre(lines,text){
   let nombre="";
   for(let i=0;i<lines.length;i++){
@@ -436,6 +440,9 @@ function inferNombre(lines,text){
       } else if(i+1<lines.length){
         posible=lines[i+1].trim();
       }
+      // Si en la misma línea venía pegada otra etiqueta (ej. "FECHA EMISIÓN:"), cortamos ahí.
+      const corte=posible.search(SIGUIENTE_ETIQUETA_RE);
+      if(corte>0) posible=posible.slice(0,corte).trim();
       posible=sanitizeName(posible);
       if(posible.length>4){
         nombre=posible;
