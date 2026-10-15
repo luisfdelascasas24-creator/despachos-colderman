@@ -430,15 +430,23 @@ function sanitizeName(v){
 const SIGUIENTE_ETIQUETA_RE=/\b(FECHA\s+EMISI[OÓ]N|FECHA\s+VENCIMIENTO|GIRO|DIRECCI[OÓ]N|COMUNA|CIUDAD|FORMA\s+DE\s+PAGO|TEL[EÉ]FONO|CELULAR|WHATSAPP|MAIL|CORREO|RUT|N[º°O]\b|SUCURSAL)\s*:/i;
 function inferNombre(lines,text){
   let nombre="";
-  for(let i=0;i<lines.length;i++){
-    const l=lines[i].toUpperCase();
+  // El nombre del cliente SIEMPRE aparece antes de la tabla de productos y antes del bloque de
+  // observaciones/condiciones legales del final. Restringimos TODA la búsqueda (tanto la línea
+  // "SEÑOR(ES):" como el plan B de respaldo) a esa zona, para que una palabra suelta como
+  // "cliente" dentro de una frase legal (ej. "EL CLIENTE ES RESPONSABLE DE LA ADQUISICIÓN, NO HAY
+  // DEVOLUCIÓN POR SATISFACCIÓN") no se confunda con la etiqueta real y termine agarrando esa
+  // frase como si fuera el nombre.
+  let finZonaCliente=lines.findIndex(x=>/^CANTIDAD\b|^OBSERVACIONES\b|^NOTA:|^NOTAS\b/i.test(x.trim()));
+  const zonaCliente=finZonaCliente===-1?lines:lines.slice(0,finZonaCliente);
+  for(let i=0;i<zonaCliente.length;i++){
+    const l=zonaCliente[i].toUpperCase();
     if(/SE[NÑ]OR(?:ES)?|SENOR(?:ES)?|CLIENTE|DESTINATARIO|A NOMBRE|RAZON SOCIAL/.test(l)){
       let posible="";
-      const partes=lines[i].split(/:\s*/);
+      const partes=zonaCliente[i].split(/:\s*/);
       if(partes.length>1 && partes[1].trim().length>2){
         posible=partes.slice(1).join(":").trim();
-      } else if(i+1<lines.length){
-        posible=lines[i+1].trim();
+      } else if(i+1<zonaCliente.length){
+        posible=zonaCliente[i+1].trim();
       }
       // Si en la misma línea venía pegada otra etiqueta (ej. "FECHA EMISIÓN:"), cortamos ahí.
       const corte=posible.search(SIGUIENTE_ETIQUETA_RE);
@@ -451,10 +459,13 @@ function inferNombre(lines,text){
     }
   }
   if(!nombre){
-    const likely=lines.find(x=>{
+    // Plan B: si no encontramos una línea "SEÑOR(ES):", buscamos cualquier línea en mayúsculas
+    // que parezca un nombre de cliente/empresa, siempre dentro de la misma zona (antes de la
+    // tabla de productos/observaciones).
+    const likely=zonaCliente.find(x=>{
       const clean=x.toUpperCase();
       return /^[A-ZÁÉÍÓÚÑ0-9 .&-]{6,}$/.test(clean) &&
-        !/(FACTURA|BOLETA|COTIZACION|COTIZACIÓN|RUT|FECHA|TOTAL|NETO|IVA|DIRECCION|DIRECCIÓN|FORMA DE PAGO|GIRO)/i.test(clean);
+        !/(FACTURA|BOLETA|COTIZACION|COTIZACIÓN|RUT|FECHA|TOTAL|NETO|IVA|DIRECCION|DIRECCIÓN|FORMA DE PAGO|GIRO|GARANTIA|GARANTÍA|SATISFACCION|SATISFACCIÓN|DEVOLUCION|DEVOLUCIÓN|RESPONSABLE|DISPONIBILIDAD|STOCK|HORARIO|RETIRO|CONFIANZA|IMPORTANTE|VENDEDOR|SOLICITE|COLDERMAN)/i.test(clean);
     });
     if(likely) nombre=sanitizeName(likely);
   }
