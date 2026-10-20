@@ -427,7 +427,12 @@ function sanitizeName(v){
 // Etiquetas de otros campos que pueden quedar pegadas en la misma línea reconstruida que el
 // nombre (ej. "SEÑOR: CLIMA OK SPA FECHA EMISIÓN: 09/10/2026" cuando el PDF tiene dos columnas
 // a la misma altura). Si aparece una de estas después del nombre, cortamos ahí.
-const SIGUIENTE_ETIQUETA_RE=/\b(FECHA\s+EMISI[OÓ]N|FECHA\s+VENCIMIENTO|GIRO|DIRECCI[OÓ]N|COMUNA|CIUDAD|FORMA\s+DE\s+PAGO|TEL[EÉ]FONO|CELULAR|WHATSAPP|MAIL|CORREO|RUT|N[º°O]\b|SUCURSAL)\s*:/i;
+const SIGUIENTE_ETIQUETA_RE=/\b(FECHA\s+EMISI\s*[OÓ]\s*N|FECHA\s+VENCIMIENTO|GIRO|DIRECCI\s*[OÓ]\s*N|COMUNA|CIUDAD|FORMA\s+DE\s+PAGO|TEL[EÉ]\s*FONO|CELULAR|WHATSAPP|MAIL|CORREO|RUT|N[º°O]\b|SUCURSAL)\s*:/i;
+// El OCR a veces lee una letra con tilde (Ñ, Ó, Á, É, Í, Ú) como si fuera un carácter aparte,
+// insertando espacios sueltos a su alrededor (ej. "SEÑOR" sale como "SE Ñ OR", "EMISIÓN" como
+// "EMISI Ó N"). Por eso la etiqueta que busca el nombre del cliente tiene que tolerar esos
+// espacios de más alrededor de la Ñ, si no, la línea completa queda sin reconocer.
+const SENOR_RE=/SE\s*[NÑ]\s*OR(?:\s*ES)?|SENOR(?:\s*ES)?|CLIENTE|DESTINATARIO|A\s*NOMBRE|RAZON\s*SOCIAL/;
 function inferNombre(lines,text){
   let nombre="";
   // El nombre del cliente SIEMPRE aparece antes de la tabla de productos y antes del bloque de
@@ -440,7 +445,7 @@ function inferNombre(lines,text){
   const zonaCliente=finZonaCliente===-1?lines:lines.slice(0,finZonaCliente);
   for(let i=0;i<zonaCliente.length;i++){
     const l=zonaCliente[i].toUpperCase();
-    if(/SE[NÑ]OR(?:ES)?|SENOR(?:ES)?|CLIENTE|DESTINATARIO|A NOMBRE|RAZON SOCIAL/.test(l)){
+    if(SENOR_RE.test(l)){
       let posible="";
       const partes=zonaCliente[i].split(/:\s*/);
       if(partes.length>1 && partes[1].trim().length>2){
@@ -556,6 +561,16 @@ function inferDocNumber(text){
 }
 function extractProductCodes(text){
   const lines=text.split("\n").map(l=>l.trim()).filter(Boolean);
+  // IMPORTANTE: buscamos los códigos SOLO dentro de la tabla de productos (desde la fila de
+  // encabezado "CANTIDAD ... SKU ..." hasta antes de observaciones/notas/totales). Si buscáramos
+  // en todo el documento, un nombre de cliente con guion en medio (ej. "CLIMATIZACION GENERAL
+  // SAN-REZ SPA") puede calzar con el patrón de código y colarse como si fuera un producto real.
+  const inicioTabla=lines.findIndex(l=>/CANTIDAD/i.test(l) && /SKU/i.test(l));
+  let zonaProductos=lines;
+  if(inicioTabla!==-1){
+    let finTabla=lines.findIndex((l,i)=>i>inicioTabla && /^OBSERVACIONES\b|^NOTA:|^NOTAS\b|^NETO\b|^TOTAL\b/i.test(l.trim()));
+    zonaProductos=lines.slice(inicioTabla+1, finTabla===-1?undefined:finTabla);
+  }
   // Los códigos de producto de Colderman siempre llevan guion (ej: CMP-0045, EVA-1234,
   // CND-14X26, FLT-FORMUL, PRE-MAC). El guion es OBLIGATORIO en esta regex para no
   // confundir el código real con nombres de modelos de vehículos que aparecen en la
@@ -566,7 +581,7 @@ function extractProductCodes(text){
   const codeRe=/\b[A-Z]{2,4}-[A-Z0-9]{2,8}\b/g;
   const found=[];
   const seen=new Set();
-  for(const line of lines){
+  for(const line of zonaProductos){
     const matches=[...line.matchAll(codeRe)];
     for(const m of matches){
       const codigo=m[0].toUpperCase();
