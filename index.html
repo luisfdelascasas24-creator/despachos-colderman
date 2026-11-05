@@ -326,6 +326,8 @@ let state={
   busqueda:"",
   filtroDia:"todos",
   filtroAgencia:"",
+  statsAbierto:false,
+  statsPeriodo:"mes",
   filtroFecha:"",
   filtroExtra:"",
   form:emptyForm(),
@@ -682,6 +684,33 @@ function findPossibleDuplicate(form){
 
 function ticketCountFor(d){ return typeof d.ticketCount==="number"?d.ticketCount:(Array.isArray(d.ticketImgs)?d.ticketImgs.length:(d.ticketImg?1:0)); }
 function hasDocFor(d){ return typeof d.hasDoc==="boolean"?d.hasDoc:!!d.docImg; }
+// Estadística por transporte (agencia / bodega / oficina) según el período elegido
+function parseFechaDespacho(f){
+  const m=String(f||"").match(/(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})/);
+  return m?new Date(+m[3],+m[2]-1,+m[1]):null;
+}
+const STATS_PERIODOS=[["hoy","Hoy"],["7d","7 días"],["mes","Este mes"],["mespasado","Mes pasado"],["todo","Todo"]];
+function statsPorTransporte(periodo){
+  const ahora=new Date(); const hoy0=new Date(ahora.getFullYear(),ahora.getMonth(),ahora.getDate());
+  let desde=null, hasta=null;
+  if(periodo==="hoy") desde=hoy0;
+  else if(periodo==="7d") desde=new Date(hoy0.getTime()-6*86400000);
+  else if(periodo==="mes") desde=new Date(ahora.getFullYear(),ahora.getMonth(),1);
+  else if(periodo==="mespasado"){ desde=new Date(ahora.getFullYear(),ahora.getMonth()-1,1); hasta=new Date(ahora.getFullYear(),ahora.getMonth(),1); }
+  const filas={}; let total=0;
+  for(const d of state.despachos){
+    const f=parseFechaDespacho(d.fecha);
+    if(desde && (!f || f<desde)) continue;
+    if(hasta && (!f || f>=hasta)) continue;
+    const k=getAgencyLabel(d)||"Sin transporte";
+    const r=filas[k]||(filas[k]={nombre:k,total:0,entregados:0,pendientes:0});
+    r.total++; total++;
+    if(d.estado==="entregado") r.entregados++;
+    else if(d.estado==="pendiente") r.pendientes++;
+  }
+  return {total,filas:Object.values(filas).sort((a,b)=>b.total-a.total)};
+}
+
 function dashboardData(){
   const hoy=new Date().toLocaleDateString("es-CL");
   return {
@@ -1381,6 +1410,16 @@ function renderLista(){
       <div class="dashboard-card"><div class="dashboard-num" style="color:#10b981">${dash.sinTicket}</div><div class="dashboard-lbl">Entregados sin ticket</div><div class="dashboard-hint">Falta comprobante</div></div>
     </div>
 
+    ${(()=>{
+      const st=state.statsAbierto?statsPorTransporte(state.statsPeriodo):null;
+      const max=st&&st.filas.length?st.filas[0].total:1;
+      return `<div class="section-card" style="padding:14px;margin-bottom:14px">
+        <button type="button" id="btnStatsToggle" class="chip" style="width:100%;justify-content:space-between;display:flex">📊 Estadística por transporte <span>${state.statsAbierto?"▲":"▼"}</span></button>
+        ${st?`<div class="chips" style="margin:12px 0">${STATS_PERIODOS.map(([k,l])=>`<button type="button" class="chip ${state.statsPeriodo===k?"active":""}" data-stats-periodo="${k}">${l}</button>`).join("")}</div>
+        ${st.filas.length?st.filas.map(r=>`<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:13px;color:#ddd;gap:8px"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(r.nombre)}</span><span style="font-weight:800;color:#e07b00;white-space:nowrap">${r.total} · ${Math.round(r.total*100/st.total)}%</span></div><div style="height:8px;background:rgba(255,255,255,.07);border-radius:6px;margin:5px 0"><div style="height:8px;width:${Math.max(4,Math.round(r.total*100/max))}%;background:linear-gradient(90deg,#e07b00,#f59e0b);border-radius:6px"></div></div><div style="font-size:11px;color:#888">✅ ${r.entregados} entregados · ⏳ ${r.pendientes} pendientes</div></div>`).join("")+`<div style="font-size:12px;color:#aaa;border-top:1px solid rgba(255,255,255,.08);padding-top:8px">Total del período: <strong>${st.total}</strong> despachos</div>`:`<div style="color:#888;font-size:13px">Sin despachos en este período.</div>`}`:""}
+      </div>`;
+    })()}
+
     <div class="counters">
       ${Object.entries(ESTADOS).map(([k,v])=>`<div class="counter" id="cnt-${k}" style="border-color:${state.filtro===k?v.color:"rgba(255,255,255,.07)"};background:${state.filtro===k?v.bg:"linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.02))"}"><div class="num" style="color:${v.color}">${c[k]}</div><div class="lbl">${v.label}</div></div>`).join("")}
     </div>
@@ -1472,6 +1511,8 @@ function bindLista(){
     const input=document.getElementById("searchInput");
     if(input){ input.focus(); input.setSelectionRange(cursorPos,cursorPos); }
   };
+  const stT=document.getElementById("btnStatsToggle"); if(stT) stT.onclick=()=>setState({statsAbierto:!state.statsAbierto});
+  document.querySelectorAll("[data-stats-periodo]").forEach(el=>{ el.onclick=()=>setState({statsPeriodo:el.dataset.statsPeriodo}); });
   document.getElementById("btnHoy").onclick=()=>setState({filtroDia:state.filtroDia==="hoy"?"todos":"hoy",filtroFecha:""});
   document.getElementById("filtroCalendario").onchange=e=>setState({filtroFecha:e.target.value,filtroDia:"todos"});
   document.getElementById("filtroAgencia").onchange=e=>setState({filtroAgencia:e.target.value});
