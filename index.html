@@ -625,23 +625,26 @@ function empresaDeProducto(d,p){
 function retirosNacionalPorEmpresa(){
   const pendientes=state.despachos.filter(d=>d.estado==="pendiente" && (d.tipoCompra==="nacional"||d.tipoCompra==="mixto"));
   const grupos={};
-  const agregar=(empresa,id,cliente,documentosListos,texto)=>{
+  const agregar=(empresa,d,texto)=>{
     grupos[empresa]=grupos[empresa]||[];
-    let entrada=grupos[empresa].find(x=>x.id===id);
-    if(!entrada){ entrada={id,cliente,documentosListos,items:[]}; grupos[empresa].push(entrada); }
+    let entrada=grupos[empresa].find(x=>x.id===d.id);
+    if(!entrada){ entrada={id:d.id,cliente:d.nombre,documentosListos:!!d.documentosListos,transporte:getAgencyLabel(d)||"",items:[]}; grupos[empresa].push(entrada); }
     entrada.items.push(texto);
   };
   pendientes.forEach(d=>{
-    const productos=Array.isArray(d.productos)?d.productos:[];
+    // Ignoramos filas de producto totalmente vacías (sin código ni descripción)
+    const productos=(Array.isArray(d.productos)?d.productos:[]).filter(p=>p && (p.codigo||p.descripcion));
+    let hayAsignado=false;
     productos.forEach(p=>{
       const empresa=empresaDeProducto(d,p);
-      if(!empresa) return;
+      if(!empresa) return; // en un despacho mixto, un producto sin proveedor es de stock propio: no hay que retirarlo
+      hayAsignado=true;
       const texto=p.codigo?`${p.codigo}${p.descripcion?" — "+p.descripcion:""}`:(p.descripcion||"Producto sin código");
-      agregar(empresa,d.id,d.nombre,!!d.documentosListos,texto);
+      agregar(empresa,d,texto);
     });
-    const sinAsignar = d.tipoCompra==="mixto" ? productos.filter(p=>!empresaDeProducto(d,p)) : (productos.length?[]:[null]);
-    if(sinAsignar.length){
-      agregar(getEmpresaLabel(d)||"Empresa sin especificar",d.id,d.nombre,!!d.documentosListos,"Revisar productos del despacho (sin proveedor asignado)");
+    // Aviso (una sola vez por despacho) si no se sabe a qué empresa ir: nacional sin productos, o mixto sin ningún producto marcado
+    if(!hayAsignado){
+      agregar(getEmpresaLabel(d)||"Empresa sin especificar",d,"Revisar productos del despacho (sin proveedor asignado)");
     }
   });
   return grupos;
@@ -1474,9 +1477,9 @@ function renderLista(){
                 <div style="margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #262629">
                   <label style="display:flex;align-items:flex-start;gap:6px;font-size:11px;font-weight:800;color:${g.documentosListos?"#10b981":"#ccc"};cursor:pointer;margin-bottom:3px">
                     <input type="checkbox" data-chk-doclisto="${g.id}" ${g.documentosListos?"checked":""} style="accent-color:#10b981;width:14px;height:14px;cursor:pointer;margin-top:1px;flex-shrink:0" />
-                    <span>${g.cliente}${g.documentosListos?" · 📋 listo, a la espera del producto":""}</span>
+                    <span>${escapeHtml(g.cliente)}${g.documentosListos?" · 📋 listo, a la espera del producto":""}</span>
                   </label>
-                  ${g.items.map(it=>`<div style="font-size:11px;color:#999;margin-left:20px;line-height:1.4">${it}</div>`).join("")}
+                  ${g.items.map(it=>`<div style="font-size:11px;color:#999;margin-left:20px;line-height:1.4">${escapeHtml(it)}${g.transporte?`<div style="color:#3b82f6;font-weight:800">🚚 Se despacha por: ${escapeHtml(g.transporte)}</div>`:""}</div>`).join("")}
                 </div>`).join("")}
             </div>`).join("");
         })()}
@@ -1732,7 +1735,7 @@ function renderDetalle(){
       <div style="background:#1a1a1a;border-radius:16px;padding:20px;margin-bottom:16px;border:1px solid #2a2a2a"><div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;gap:8px"><div><div style="font-size:18px;font-weight:800">${d.nombre} <span class="btn-copy" data-copy="${(d.nombre||"").toUpperCase().replace(/"/g,"&quot;")}" data-label="Nombre" style="cursor:pointer;font-size:14px;opacity:.6">📋</span></div>${d.rut?`<div style="color:#888;font-size:13px">RUT: ${d.rut} <span class="btn-copy" data-copy="${(d.rut||"").toUpperCase().replace(/"/g,"&quot;")}" data-label="RUT" style="cursor:pointer;opacity:.6">📋</span></div>`:""}</div>${badge(d.estado)}</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">${d.nDoc?`<span class="pill">📄 N° ${d.nDoc}</span>`:""}${d.tracking?`<span class="pill">🚚 ${d.tracking}</span>`:""}${ticketImgs.length?`<span class="pill">🧾 ${ticketImgs.length} ticket${ticketImgs.length>1?"s":""}</span>`:`<span class="pill">🧾 Sin ticket</span>`}</div><div class="row"><span class="lbl">Tipo</span><span class="val">${UP(d.tipoCompra==="importacion"?"🌏 Importación":d.tipoCompra==="mixto"?"🌏🇨🇱 Mixto (Importación + Nacional)":"🇨🇱 Compra nacional")}</span></div>${empresaLabel?`<div class="row"><span class="lbl">Empresa</span><span class="val">${UP(empresaLabel)}</span></div>`:""}<div class="row"><span class="lbl">Destino</span><span class="val">${UP(destinoLabel)}</span></div>${agenciaLabel?`<div class="row"><span class="lbl">Agencia</span><span class="val">${UP(agenciaLabel)} <span class="btn-copy" data-copy="${UP(agenciaLabel).replace(/"/g,"&quot;")}" data-label="Transporte" style="cursor:pointer;opacity:.6">📋</span></span></div>`:""}${d.direccionDestino?`<div class="row"><span class="lbl">Dirección</span><span class="val">${UP(d.direccionDestino)} <span class="btn-copy" data-copy="${UP(d.direccionDestino).replace(/"/g,"&quot;")}" data-label="Dirección" style="cursor:pointer;opacity:.6">📋</span></span></div>`:""}${d.region?`<div class="row"><span class="lbl">Región</span><span class="val">${UP(d.region)}</span></div>`:""}${d.bultos?`<div class="row"><span class="lbl">Bultos</span><span class="val">${UP(d.bultos)}</span></div>`:""}${d.telefono?`<div class="row"><span class="lbl">Teléfono</span><span class="val">${UP(d.telefono)} <span class="btn-copy" data-copy="${UP(d.telefono).replace(/"/g,"&quot;")}" data-label="Teléfono" style="cursor:pointer;opacity:.6">📋</span></span></div>`:""}${d.notas?`<div class="row"><span class="lbl">Notas</span><span class="val">${UP(d.notas)}</span></div>`:""}<div class="row"><span class="lbl">Ingresado</span><span class="val">${UP(d.fecha||"")}</span></div></div>
       <div style="font-size:13px;color:#aaa;font-weight:700;margin:16px 0 10px">DOCUMENTO ORIGINAL</div>
       ${docImg?`<div class="gallery"><div class="thumb" data-doc-open="1"><img src="${docImg}" alt="Documento" /><div class="thumb-label">Documento</div></div></div>`:cargandoImgs?`<div style="color:#777;font-size:13px;margin-bottom:16px">⏳ Cargando foto...</div>`:`<div style="color:#555;font-size:13px;margin-bottom:16px">Sin documento adjunto.</div>`}
-      ${(Array.isArray(d.productos)&&d.productos.length)?`<div style="font-size:13px;color:#aaa;font-weight:700;margin:16px 0 10px">⚠️ PRODUCTOS (VERIFICA EL CÓDIGO)</div><div style="margin-bottom:16px">${d.productos.map(p=>`<div style="background:#1a1a1a;border:1px solid #3b2400;border-radius:12px;padding:10px 14px;margin-bottom:8px"><div style="font-size:16px;font-weight:900;color:#ff8c00;letter-spacing:.5px">${p.codigo||"(sin código)"}${empresaDeProducto(d,p)?` <span style="font-size:11px;font-weight:800;color:#ccc;background:#111;border:1px solid #3b2400;border-radius:999px;padding:2px 8px;vertical-align:middle">🏭 ${empresaDeProducto(d,p)}</span>`:""}</div>${p.descripcion?`<div style="font-size:12px;color:#bbb;margin-top:2px">${p.descripcion}</div>`:""}</div>`).join("")}</div>`:""}
+      ${(Array.isArray(d.productos)&&d.productos.length)?`<div style="font-size:13px;color:#aaa;font-weight:700;margin:16px 0 10px">⚠️ PRODUCTOS (VERIFICA EL CÓDIGO)</div><div style="margin-bottom:16px">${d.productos.map(p=>`<div style="background:#1a1a1a;border:1px solid #3b2400;border-radius:12px;padding:10px 14px;margin-bottom:8px"><div style="font-size:16px;font-weight:900;color:#ff8c00;letter-spacing:.5px">${p.codigo||"(sin código)"}${empresaDeProducto(d,p)?` <span style="font-size:11px;font-weight:800;color:#ccc;background:#111;border:1px solid #3b2400;border-radius:999px;padding:2px 8px;vertical-align:middle">🏭 ${empresaDeProducto(d,p)}</span>`:""}</div>${p.descripcion?`<div style="font-size:12px;color:#bbb;margin-top:2px">${p.descripcion}</div>`:""}${(empresaDeProducto(d,p)&&getAgencyLabel(d))?`<div style="font-size:12px;color:#3b82f6;font-weight:800;margin-top:4px">🚚 Se despacha por: ${escapeHtml(getAgencyLabel(d))}</div>`:""}</div>`).join("")}</div>`:""}
       ${(d.tipoCompra==="nacional"||d.tipoCompra==="mixto")&&d.estado==="pendiente"?`
       <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;color:${d.documentosListos?"#10b981":"#8a8f98"};cursor:pointer;background:${d.documentosListos?"#002a1a":"#1a1a1a"};border:1px solid ${d.documentosListos?"#10b981":"#333"};border-radius:12px;padding:10px 14px;margin:16px 0">
         <input type="checkbox" id="chkDocumentosListos" ${d.documentosListos?"checked":""} style="accent-color:#10b981;width:17px;height:17px;cursor:pointer" />
