@@ -1039,6 +1039,11 @@ window.addEventListener("popstate",e=>{
   else if(vista==="detalle") setState({view:"detalle"});
   else if(vista==="nuevo") setState({view:"nuevo"});
 });
+function enEspera(d){ return d.estado==="pendiente" && !!d.documentosListos; }
+function badgeDespacho(d){
+  if(enEspera(d)) return `<span class="badge" style="color:#60a5fa;border-color:#60a5fa;background:rgba(96,165,250,.12)">📋 A la espera del producto</span>`;
+  return badge(d.estado);
+}
 function badge(e){ const v=ESTADOS[e]||ESTADOS.pendiente; return `<span class="badge" style="color:${v.color};border-color:${v.color};background:${v.bg}">${v.label}</span>`; }
 function counts(){ return { pendiente:state.despachos.filter(d=>d.estado==="pendiente").length, empacado:state.despachos.filter(d=>d.estado==="empacado").length, entregado:state.despachos.filter(d=>d.estado==="entregado").length, falta_doc:state.despachos.filter(d=>d.estado==="falta_doc").length }; }
 
@@ -1314,6 +1319,7 @@ function renderLista(){
     if(state.filtroAgencia) arr=arr.filter(d=>getAgencyLabel(d)===state.filtroAgencia);
     if(state.filtroExtra==="atrasados") arr=arr.filter(d=>d.estado==="pendiente" && d.fecha!==hoy);
     if(state.filtroExtra==="sin_ticket") arr=arr.filter(d=>d.estado==="entregado" && !ticketCountFor(d));
+    if(state.filtroExtra==="en_espera") arr=arr.filter(enEspera);
     if(state.filtroExtra==="sin_enviar") arr=arr.filter(d=>ticketCountFor(d)>0 && !d.ticketEnviado);
     if(state.filtroExtra==="nacional") arr=arr.filter(d=>d.tipoCompra==="nacional");
     if(state.filtroExtra==="importacion") arr=arr.filter(d=>d.tipoCompra==="importacion");
@@ -1331,7 +1337,7 @@ function renderLista(){
     const atrasado=d.estado==="pendiente" && d.fecha!==hoy; const ticketCount=ticketCountFor(d);
     const esNueva=state._nuevoDestacadoId===d.id;
     return `
-      <div class="card list-card soft-fade${esNueva?" card-nuevo":""}" data-id="${d.id}" style="border-color:${atrasado?"rgba(239,68,68,.25)":"rgba(255,255,255,.07)"}">
+      <div class="card list-card soft-fade${esNueva?" card-nuevo":""}" data-id="${d.id}" style="border-color:${enEspera(d)?"rgba(96,165,250,.25)":atrasado?"rgba(239,68,68,.25)":"rgba(255,255,255,.07)"};${enEspera(d)?"opacity:.8":""}">
         <div class="list-card-top">
           <div style="flex:1;min-width:0">
             <div class="client-title">${d.nombre}</div>
@@ -1342,7 +1348,7 @@ function renderLista(){
             </div>
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
-            ${badge(d.estado)}
+            ${badgeDespacho(d)}
             <div style="font-size:12px;color:${atrasado?"#ef4444":"#7b818b"};font-weight:700">${d.fecha||""}</div>
           </div>
         </div>
@@ -1445,6 +1451,7 @@ function renderLista(){
         <div class="chips">
           <button class="chip ${state.filtroExtra==="atrasados"?"active":""}" id="chipAtrasados">Pendientes atrasados</button>
           <button class="chip ${state.filtroExtra==="sin_ticket"?"active":""}" id="chipSinTicket">Sin ticket</button>
+          <button class="chip ${state.filtroExtra==="en_espera"?"active":""}" id="chipEnEspera">📋 A la espera del producto</button>
           <button class="chip ${state.filtroExtra==="sin_enviar"?"active":""}" id="chipSinEnviar">🧾 Con ticket, sin enviar</button>
           <button class="chip ${state.filtroExtra==="importacion"?"active":""}" id="chipImportacion">Importación</button>
           <button class="chip ${state.filtroExtra==="nacional"?"active":""}" id="chipNacional">Nacional</button>
@@ -1522,6 +1529,7 @@ function bindLista(){
   const x1=document.getElementById("btnLimpiarFecha"); if(x1) x1.onclick=()=>setState({filtroFecha:""});
   document.getElementById("chipAtrasados").onclick=()=>setState({filtroExtra:state.filtroExtra==="atrasados"?"":"atrasados"});
   document.getElementById("chipSinTicket").onclick=()=>setState({filtroExtra:state.filtroExtra==="sin_ticket"?"":"sin_ticket"});
+  document.getElementById("chipEnEspera").onclick=()=>setState({filtroExtra:state.filtroExtra==="en_espera"?"":"en_espera"});
   document.getElementById("chipSinEnviar").onclick=()=>setState({filtroExtra:state.filtroExtra==="sin_enviar"?"":"sin_enviar"});
   document.querySelectorAll("[data-chk-enviado]").forEach(cb=>{ cb.onchange=(e)=>{ e.stopPropagation(); dbTicketEnviado(+cb.dataset.chkEnviado,cb.checked); }; });
   document.querySelectorAll("[data-chk-doclisto]").forEach(cb=>{ cb.onchange=(e)=>{ e.stopPropagation(); dbDocumentosListos(+cb.dataset.chkDoclisto,cb.checked); }; });
