@@ -1767,7 +1767,7 @@ function renderDetalle(){
           ✅ Ticket enviado al cliente
         </label>
       </div>
-      ${ticketImgs.length?`<div class="gallery" style="margin-bottom:10px">${ticketImgs.map((img,idx)=>`<div class="thumb" data-ticket-open="${idx}"><img src="${img}" alt="Ticket ${idx+1}" /><div class="thumb-label">Ticket ${idx+1}</div></div>`).join("")}</div><div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap"><button id="btnWhatsapp" class="btn-primary" style="background:#25D366">📲 WhatsApp (foto + texto)</button><button id="btnDescargarTodo" class="btn-secondary">⬇️ Descargar ticket principal</button></div>`:cargandoImgs?`<div style="color:#777;font-size:13px;margin-bottom:10px">⏳ Cargando foto(s)...</div>`:`<div style="color:#555;font-size:13px;margin-bottom:10px">No hay foto del ticket aún.</div>`}
+      ${ticketImgs.length?`<div class="gallery" style="margin-bottom:10px">${ticketImgs.map((img,idx)=>`<div class="thumb" data-ticket-open="${idx}" style="position:relative"><button type="button" class="thumb-del" data-ticket-del="${idx}" aria-label="Eliminar ticket ${idx+1}" style="position:absolute;top:10px;right:10px;width:26px;height:26px;border-radius:50%;border:none;background:rgba(0,0,0,.7);color:#fff;font-size:15px;font-weight:900;line-height:1;cursor:pointer;z-index:2">✕</button><img src="${img}" alt="Ticket ${idx+1}" /><div class="thumb-label">Ticket ${idx+1}</div></div>`).join("")}</div><div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap"><button id="btnWhatsapp" class="btn-primary" style="background:#25D366">📲 WhatsApp (foto + texto)</button><button id="btnDescargarTodo" class="btn-secondary">⬇️ Descargar ticket principal</button></div>`:cargandoImgs?`<div style="color:#777;font-size:13px;margin-bottom:10px">⏳ Cargando foto(s)...</div>`:`<div style="color:#555;font-size:13px;margin-bottom:10px">No hay foto del ticket aún.</div>`}
       <div class="upload-area" id="ticketUpload" style="margin-bottom:8px"><div style="font-size:24px">📷</div><div style="color:#ddd;font-size:13px;margin-top:4px;font-weight:700">${ticketImgs.length?"Agregar / cambiar ticket(s)":"Subir ticket(s)"}</div><div style="color:#777;font-size:12px;margin-top:6px">Puedes subir varias fotos. En FedEx, sube las 2.</div></div>
       <div style="text-align:center;margin-bottom:8px"><button type="button" id="btnTicketCam" class="btn-secondary" style="font-size:13px;padding:8px 14px">📷 Tomar foto con cámara trasera</button></div>
       <div style="text-align:center;font-size:12px;color:#555;margin-bottom:16px">o pega una imagen con <span class="kdb">Ctrl+V</span></div>
@@ -1806,6 +1806,22 @@ function bindDetalle(){
     };
   }
   document.querySelectorAll("[data-doc-open]").forEach(el=>{ el.onclick=()=>openImageOverlay(docImg,`documento-${slugify(d.nombre)}.jpg`); });
+  document.querySelectorAll("[data-ticket-del]").forEach(btn=>{
+    btn.onclick=async e=>{
+      e.stopPropagation();
+      const idx=+btn.dataset.ticketDel;
+      if(!confirm(`¿Seguro que quieres eliminar la foto del Ticket ${idx+1}? Esta acción no se puede deshacer.`)) return;
+      const dd=state.despachos.find(x=>x.id===state.selectedId); if(!dd) return;
+      const actuales=await fetchImgsNow(dd.fbKey);
+      const lista=Array.isArray(actuales.ticketImgs)&&actuales.ticketImgs.length?[...actuales.ticketImgs]:(Array.isArray(dd.ticketImgs)?[...dd.ticketImgs]:(dd.ticketImg?[dd.ticketImg]:[]));
+      if(idx<0||idx>=lista.length) return;
+      lista.splice(idx,1);
+      const nuevo={...dd,ticketImgs:lista,ticketImg:lista[0]||"",historial:addHistory(dd,"Ticket eliminado",`Se eliminó la foto del Ticket ${idx+1}`)};
+      if(!lista.length) nuevo.ticketEnviado=false; // sin fotos, ya no corresponde "ticket enviado"
+      dbActualizar(nuevo);
+      showToast("Foto del ticket eliminada");
+    };
+  });
   document.querySelectorAll("[data-ticket-open]").forEach(el=>{ const idx=+el.dataset.ticketOpen; el.onclick=()=>openImageOverlay(ticketImgs[idx]); });
   document.querySelectorAll(".btn-estado").forEach(btn=>{ btn.onclick=()=>{ const nuevoEstado=btn.dataset.estado; if(nuevoEstado==="entregado" && !ticketImgs.length){ const seguir=confirm("Este despacho se marcará como entregado sin ticket. ¿Continuar?"); if(!seguir) return; } dbEstado(state.selectedId,btn.dataset.fbkey,nuevoEstado); }; });
   const chkEnviadoDetalle=document.getElementById("chkTicketEnviadoDetalle"); if(chkEnviadoDetalle) chkEnviadoDetalle.onchange=(e)=>dbTicketEnviado(d.id,e.target.checked);
