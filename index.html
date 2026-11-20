@@ -236,6 +236,7 @@
     .card-footer{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:14px;padding-top:12px;border-top:1px dashed rgba(255,255,255,.06)}
     .ticket-count{font-size:13px;font-weight:800;color:var(--ok)}
     .ticket-none{font-size:13px;font-weight:800;color:#8a8f98}
+    .sin-anim .soft-fade{animation:none!important}
     .soft-fade{animation:fadeUp .42s cubic-bezier(.22,.9,.32,1.3) both}
     @keyframes fadeUp{from{opacity:0;transform:translateY(16px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
     .layout-main .card:nth-child(1){animation-delay:.02s}
@@ -1308,10 +1309,7 @@ function render(){
   if(cambioVista){ window.scrollTo(0,y); requestAnimationFrame(()=>window.scrollTo(0,y)); }
 }
 
-function renderLista(){
-  const c=counts(), dash=dashboardData(), hoy=new Date().toLocaleDateString("es-CL");
-  const pendientesAtrasados=state.despachos.filter(d=>d.estado==="pendiente" && d.fecha!==hoy);
-  const sinTicket=state.despachos.filter(d=>d.estado==="entregado" && !ticketCountFor(d));
+function construirCardsLista(hoy){
   const filtrados=(()=>{
     let arr=state.filtro==="todos"?[...state.despachos]:state.despachos.filter(d=>d.estado===state.filtro);
     if(state.filtroDia==="hoy") arr=arr.filter(d=>d.fecha===hoy);
@@ -1390,6 +1388,14 @@ function renderLista(){
         </div>
       </div>`;
   }).join("");
+  return cards;
+}
+
+function renderLista(){
+  const c=counts(), dash=dashboardData(), hoy=new Date().toLocaleDateString("es-CL");
+  const pendientesAtrasados=state.despachos.filter(d=>d.estado==="pendiente" && d.fecha!==hoy);
+  const sinTicket=state.despachos.filter(d=>d.estado==="entregado" && !ticketCountFor(d));
+  const cards=construirCardsLista(hoy);
 
   return `
     <div class="header">
@@ -1501,6 +1507,12 @@ function renderLista(){
     </div>`;
 }
 
+function bindCardsLista(){
+  document.querySelectorAll(".card[data-id]").forEach(el=>{ el.onclick=(e)=>{ if(e.target.closest(".quick-wa")) return; irADetalle(+el.dataset.id); }; });
+  document.querySelectorAll(".quick-wa").forEach(btn=>{ btn.onclick=(e)=>{ e.stopPropagation(); const d=state.despachos.find(x=>x.id===+btn.dataset.quickwa); if(d) triggerQuickShare(d,btn); }; });
+  document.querySelectorAll("[data-chk-enviado]").forEach(cb=>{ cb.onchange=(e)=>{ e.stopPropagation(); dbTicketEnviado(+cb.dataset.chkEnviado,cb.checked); }; });
+}
+
 function bindLista(){
   const btnInstall=document.getElementById("btnInstallApp");
   if(btnInstall) btnInstall.onclick=triggerInstall;
@@ -1512,14 +1524,19 @@ function bindLista(){
   const btnActivarNotif=document.getElementById("btnActivarNotif");
   if(btnActivarNotif) btnActivarNotif.onclick=activarNotificaciones;
   Object.keys(ESTADOS).forEach(k=>{ document.getElementById("cnt-"+k).onclick=()=>setState({filtro:state.filtro===k?"todos":k}); });
-  document.querySelectorAll(".card[data-id]").forEach(el=>{ el.onclick=(e)=>{ if(e.target.closest(".quick-wa")) return; irADetalle(+el.dataset.id); }; });
-  document.querySelectorAll(".quick-wa").forEach(btn=>{ btn.onclick=(e)=>{ e.stopPropagation(); const d=state.despachos.find(x=>x.id===+btn.dataset.quickwa); if(d) triggerQuickShare(d,btn); }; });
+  bindCardsLista();
   document.getElementById("searchInput").oninput=e=>{
-    const cursorPos=e.target.selectionStart;
     state.busqueda=e.target.value;
-    render();
-    const input=document.getElementById("searchInput");
-    if(input){ input.focus(); input.setSelectionRange(cursorPos,cursorPos); }
+    // Esperamos a que termines de escribir (220 ms) y solo redibujamos la lista de tarjetas,
+    // no toda la pantalla: así escribir es fluido aunque haya cientos de despachos.
+    clearTimeout(window._busquedaTimer);
+    window._busquedaTimer=setTimeout(()=>{
+      const cont=document.querySelector(".layout-main");
+      if(!cont){ render(); return; }
+      cont.classList.add("sin-anim");
+      cont.innerHTML=construirCardsLista(new Date().toLocaleDateString("es-CL"));
+      bindCardsLista();
+    },220);
   };
   const stT=document.getElementById("btnStatsToggle"); if(stT) stT.onclick=()=>setState({statsAbierto:!state.statsAbierto});
   document.querySelectorAll("[data-stats-periodo]").forEach(el=>{ el.onclick=()=>setState({statsPeriodo:el.dataset.statsPeriodo}); });
@@ -1531,7 +1548,6 @@ function bindLista(){
   document.getElementById("chipSinTicket").onclick=()=>setState({filtroExtra:state.filtroExtra==="sin_ticket"?"":"sin_ticket"});
   document.getElementById("chipEnEspera").onclick=()=>setState({filtroExtra:state.filtroExtra==="en_espera"?"":"en_espera"});
   document.getElementById("chipSinEnviar").onclick=()=>setState({filtroExtra:state.filtroExtra==="sin_enviar"?"":"sin_enviar"});
-  document.querySelectorAll("[data-chk-enviado]").forEach(cb=>{ cb.onchange=(e)=>{ e.stopPropagation(); dbTicketEnviado(+cb.dataset.chkEnviado,cb.checked); }; });
   document.querySelectorAll("[data-chk-doclisto]").forEach(cb=>{ cb.onchange=(e)=>{ e.stopPropagation(); dbDocumentosListos(+cb.dataset.chkDoclisto,cb.checked); }; });
   document.getElementById("chipImportacion").onclick=()=>setState({filtroExtra:state.filtroExtra==="importacion"?"":"importacion"});
   document.getElementById("chipNacional").onclick=()=>setState({filtroExtra:state.filtroExtra==="nacional"?"":"nacional"});
@@ -1819,6 +1835,7 @@ function bindDetalle(){
       const nuevo={...dd,ticketImgs:lista,ticketImg:lista[0]||"",historial:addHistory(dd,"Ticket eliminado",`Se eliminó la foto del Ticket ${idx+1}`)};
       if(!lista.length) nuevo.ticketEnviado=false; // sin fotos, ya no corresponde "ticket enviado"
       dbActualizar(nuevo);
+      render(); // refresca ya mismo la galería (antes había que salir y volver)
       showToast("Foto del ticket eliminada");
     };
   });
