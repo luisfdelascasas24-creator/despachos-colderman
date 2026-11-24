@@ -327,6 +327,7 @@ let state={
   busqueda:"",
   filtroDia:"todos",
   filtroAgencia:"",
+  revSoloPend:false,
   statsAbierto:false,
   statsPeriodo:"mes",
   filtroFecha:"",
@@ -991,7 +992,7 @@ function dbActualizar(d){
     state.despachos=state.despachos.map(x=>x.id===d.id?completo:x); saveLocal(); render();
   }
 }
-function dbEstado(id,fbKey,estado){ const d=state.despachos.find(x=>x.id===id); if(!d) return; const emailActual=(window._auth && window._auth.currentUser && window._auth.currentUser.email) || ""; dbActualizar({...d,estado,editadoPor:emailActual,historial:addHistory(d,"Estado cambiado",`${estado}${emailActual?" · "+nombreDeUsuario(emailActual):""}`)}); showToast("Estado actualizado"); }
+function dbEstado(id,fbKey,estado){ const d=state.despachos.find(x=>x.id===id); if(!d) return; const emailActual=(window._auth && window._auth.currentUser && window._auth.currentUser.email) || ""; dbActualizar({...d,estado,revisado:false,editadoPor:emailActual,historial:addHistory(d,"Estado cambiado",`${estado}${emailActual?" · "+nombreDeUsuario(emailActual):""}`)}); showToast("Estado actualizado"); }
 function dbTicketEnviado(id,valor){
   const d=state.despachos.find(x=>x.id===id); if(!d) return;
   const emailActual=(window._auth && window._auth.currentUser && window._auth.currentUser.email) || "";
@@ -1039,6 +1040,7 @@ window.addEventListener("popstate",e=>{
   if(vista==="lista") setState({view:"lista",selectedId:null,form:emptyForm(),_restoreScroll:state.listScroll});
   else if(vista==="detalle") setState({view:"detalle"});
   else if(vista==="nuevo") setState({view:"nuevo"});
+  else if(vista==="revision") setState({view:"revision"});
 });
 function enEspera(d){ return d.estado==="pendiente" && !!d.documentosListos; }
 function badgeDespacho(d){
@@ -1302,6 +1304,7 @@ function render(){
   state._vistaPrevia=state.view;
   if(state.view!=="detalle") state._modoEnviar=false;
   if(state.view==="nuevo"){ app.innerHTML=renderNuevo(); bindNuevo(); if(cambioVista) window.scrollTo(0,0); return; }
+  if(state.view==="revision"){ app.innerHTML=renderRevision(); bindRevision(); if(cambioVista) window.scrollTo(0,0); return; }
   if(state.view==="detalle"){ app.innerHTML=renderDetalle(); bindDetalle(); if(cambioVista) window.scrollTo(0,0); return; }
   app.innerHTML=renderLista(); bindLista();
   // al volver desde un despacho, regresamos a la misma posición de la lista
@@ -1391,6 +1394,97 @@ function construirCardsLista(hoy){
   return cards;
 }
 
+// ===== Revisión antes de despachar =====
+// Solo pedidos EMPACADOS que salen a despacho (región u oficina); los de bodega los ve otra persona.
+function despachosParaRevision(){
+  return state.despachos.filter(d=>d.estado==="empacado" && d.destino!=="bodega");
+}
+function chequeosRevision(d){
+  const ok=[], faltan=[];
+  const c=(cond,txt)=>{ (cond?ok:faltan).push(txt); };
+  c(hasDocFor(d),"Documento");
+  c(!!String(d.bultos||"").trim(),"Bultos");
+  if(d.destino==="provincia"){
+    c(!!d.agencia && (d.agencia!=="Otra..."||!!String(d.agenciaCustom||"").trim()),"Agencia");
+    c(!!String(d.direccionDestino||"").trim(),"Dirección destino");
+  } else {
+    c(!!String(d.direccionDestino||"").trim(),"Dirección");
+  }
+  c(!!String(d.telefono||"").trim(),"Teléfono");
+  return {ok,faltan};
+}
+function irARevision(){
+  if(state.view==="lista") state.listScroll=window.scrollY;
+  _profundidad+=1; history.pushState({vista:"revision",prof:_profundidad},"");
+  setState({view:"revision"});
+}
+function dbRevisado(id,valor){
+  const d=state.despachos.find(x=>x.id===id); if(!d) return;
+  const emailActual=(window._auth && window._auth.currentUser && window._auth.currentUser.email) || "";
+  dbActualizar({...d,revisado:valor,revisadoPor:valor?emailActual:"",historial:addHistory(d,valor?"Revisado antes de despachar":"Revisión desmarcada",emailActual?nombreDeUsuario(emailActual):"")});
+}
+function entregarRevisados(ids){
+  const emailActual=(window._auth && window._auth.currentUser && window._auth.currentUser.email) || "";
+  ids.forEach(id=>{
+    const d=state.despachos.find(x=>x.id===id); if(!d||d.estado!=="empacado") return;
+    dbActualizar({...d,estado:"entregado",revisado:false,editadoPor:emailActual,historial:addHistory(d,"Estado cambiado",`entregado (revisión de despacho)${emailActual?" · "+nombreDeUsuario(emailActual):""}`)});
+  });
+  showToast(`✅ ${ids.length} pedido${ids.length>1?"s":""} marcado${ids.length>1?"s":""} como entregado`);
+}
+function renderRevision(){
+  const todos=despachosParaRevision();
+  const revisados=todos.filter(d=>d.revisado).length;
+  const lista=state.revSoloPend?todos.filter(d=>!d.revisado):todos;
+  const grupos={};
+  lista.forEach(d=>{ const k=getAgencyLabel(d)||"Sin transporte"; (grupos[k]=grupos[k]||[]).push(d); });
+  const nombres=Object.keys(grupos).sort((a,b)=>grupos[b].length-grupos[a].length);
+  const conFaltantes=todos.filter(d=>chequeosRevision(d).faltan.length).length;
+  return `
+    <div class="header"><button class="btn-back" id="btnBack">←</button><span style="font-weight:700;font-size:16px">Revisión antes de despachar</span><div style="width:40px"></div></div>
+    <div class="page">
+      <div class="card" style="padding:16px;margin-bottom:14px">
+        <div style="font-size:22px;font-weight:900;color:${todos.length&&revisados===todos.length?"#10b981":"#f59e0b"}">${revisados} de ${todos.length} revisados</div>
+        <div style="height:8px;background:rgba(255,255,255,.08);border-radius:6px;margin:10px 0"><div style="height:8px;width:${todos.length?Math.round(revisados*100/todos.length):0}%;background:linear-gradient(90deg,#10b981,#34d399);border-radius:6px"></div></div>
+        <div style="font-size:12px;color:#999">${conFaltantes?`⚠️ ${conFaltantes} pedido${conFaltantes>1?"s":""} con datos faltantes`:"✅ Todos los pedidos tienen sus datos completos"} · Solo pedidos empacados que salen a despacho (no incluye bodega)</div>
+        <div style="margin-top:12px"><button type="button" class="chip ${state.revSoloPend?"active":""}" id="btnRevSoloPend">👁 Solo sin revisar</button></div>
+      </div>
+      ${nombres.length?nombres.map(nm=>{
+        const arr=grupos[nm], rev=arr.filter(d=>d.revisado);
+        return `<div style="margin-bottom:18px">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin:0 0 8px"><div style="font-weight:900;color:#f59e0b;font-size:15px">🚚 ${escapeHtml(nm)} <span style="color:#888;font-weight:700">(${arr.filter(d=>d.revisado).length}/${arr.length})</span></div>
+          ${rev.length?`<button type="button" class="btn-primary" data-rev-entregar="${nm.replace(/"/g,"&quot;")}" style="padding:8px 12px;font-size:12px;background:#10b981">Dejados: marcar ${rev.length} como Entregado</button>`:""}</div>
+          ${arr.map(d=>{
+            const ch=chequeosRevision(d);
+            return `<div class="card" style="padding:12px 14px;margin-bottom:8px;border-color:${d.revisado?"rgba(16,185,129,.35)":ch.faltan.length?"rgba(239,68,68,.3)":"rgba(255,255,255,.07)"}">
+              <div style="display:flex;gap:10px;align-items:flex-start">
+                <input type="checkbox" data-rev-chk="${d.id}" ${d.revisado?"checked":""} style="width:24px;height:24px;margin-top:2px;flex:none" aria-label="Revisado" />
+                <div style="flex:1;min-width:0">
+                  <div style="font-weight:800;font-size:15px">${escapeHtml(d.nombre||"(sin nombre)")} <span style="color:#888;font-weight:600;font-size:12px">${d.nDoc?"N° "+escapeHtml(d.nDoc):""}${d.bultos?" · "+escapeHtml(d.bultos)+" bulto(s)":""}</span></div>
+                  <div style="font-size:12px;color:#aaa;margin:2px 0 6px">${d.destino==="provincia"?"📦 Región":"🏢 Oficina"}${d.direccionDestino?" · "+escapeHtml(d.direccionDestino):""}</div>
+                  <div style="display:flex;gap:6px;flex-wrap:wrap">${ch.ok.map(t=>`<span style="font-size:11px;color:#10b981;background:rgba(16,185,129,.1);border-radius:8px;padding:3px 8px">✅ ${t}</span>`).join("")}${ch.faltan.map(t=>`<span style="font-size:11px;color:#ef4444;background:rgba(239,68,68,.12);border-radius:8px;padding:3px 8px;font-weight:800">⚠️ Falta ${t}</span>`).join("")}</div>
+                </div>
+                <button type="button" class="btn-secondary" data-rev-abrir="${d.id}" style="padding:6px 10px;font-size:12px;flex:none">Abrir</button>
+              </div></div>`;
+          }).join("")}
+        </div>`;
+      }).join(""):`<div class="empty">${todos.length?"🎉 Todo revisado.":"No hay pedidos empacados para despachar."}</div>`}
+    </div>`;
+}
+function bindRevision(){
+  document.getElementById("btnBack").onclick=volverUnPaso;
+  document.getElementById("btnRevSoloPend").onclick=()=>setState({revSoloPend:!state.revSoloPend});
+  document.querySelectorAll("[data-rev-chk]").forEach(cb=>{ cb.onchange=()=>{ const y=window.scrollY; dbRevisado(+cb.dataset.revChk,cb.checked); render(); window.scrollTo(0,y); }; });
+  document.querySelectorAll("[data-rev-abrir]").forEach(b=>{ b.onclick=()=>irADetalle(+b.dataset.revAbrir); });
+  document.querySelectorAll("[data-rev-entregar]").forEach(b=>{ b.onclick=()=>{
+    const nm=b.dataset.revEntregar;
+    const ids=despachosParaRevision().filter(d=>d.revisado && (getAgencyLabel(d)||"Sin transporte")===nm).map(d=>d.id);
+    if(!ids.length) return;
+    const faltan=ids.map(id=>state.despachos.find(x=>x.id===id)).filter(d=>chequeosRevision(d).faltan.length).length;
+    if(!confirm(`¿Marcar ${ids.length} pedido${ids.length>1?"s":""} de ${nm} como ENTREGADO (ya dejados)?${faltan?`\n\n⚠️ ${faltan} tiene${faltan>1?"n":""} datos faltantes.`:""}`)) return;
+    entregarRevisados(ids); render();
+  }; });
+}
+
 function renderLista(){
   const c=counts(), dash=dashboardData(), hoy=new Date().toLocaleDateString("es-CL");
   const pendientesAtrasados=state.despachos.filter(d=>d.estado==="pendiente" && d.fecha!==hoy);
@@ -1425,6 +1519,10 @@ function renderLista(){
       <div class="dashboard-card"><div class="dashboard-num" style="color:#10b981">${dash.sinTicket}</div><div class="dashboard-lbl">Entregados sin ticket</div><div class="dashboard-hint">Falta comprobante</div></div>
     </div>
 
+    ${(()=>{
+      const n=despachosParaRevision().length;
+      return `<button type="button" id="btnIrRevision" class="btn-primary" style="width:100%;margin-bottom:12px;padding:14px;font-size:15px">✅ Revisión antes de despachar${n?` · ${n} empacado${n>1?"s":""}`:""}</button>`;
+    })()}
     ${(()=>{
       const st=state.statsAbierto?statsPorTransporte(state.statsPeriodo):null;
       const max=st&&st.filas.length?st.filas[0].total:1;
@@ -1538,6 +1636,7 @@ function bindLista(){
       bindCardsLista();
     },220);
   };
+  const bRev=document.getElementById("btnIrRevision"); if(bRev) bRev.onclick=irARevision;
   const stT=document.getElementById("btnStatsToggle"); if(stT) stT.onclick=()=>setState({statsAbierto:!state.statsAbierto});
   document.querySelectorAll("[data-stats-periodo]").forEach(el=>{ el.onclick=()=>setState({statsPeriodo:el.dataset.statsPeriodo}); });
   document.getElementById("btnHoy").onclick=()=>setState({filtroDia:state.filtroDia==="hoy"?"todos":"hoy",filtroFecha:""});
