@@ -1403,7 +1403,7 @@ function chequeosRevision(d){
   const ok=[], faltan=[];
   const c=(cond,txt)=>{ (cond?ok:faltan).push(txt); };
   c(hasDocFor(d),"Documento");
-  c(!!String(d.bultos||"").trim(),"Bultos");
+  c(!!String(d.rut||"").trim(),"RUT");
   if(d.destino==="provincia"){
     c(!!d.agencia && (d.agencia!=="Otra..."||!!String(d.agenciaCustom||"").trim()),"Agencia");
     c(!!String(d.direccionDestino||"").trim(),"Dirección destino");
@@ -1451,20 +1451,18 @@ function renderRevision(){
       ${nombres.length?nombres.map(nm=>{
         const arr=grupos[nm], rev=arr.filter(d=>d.revisado);
         return `<div style="margin-bottom:18px">
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin:0 0 8px"><div style="font-weight:900;color:#f59e0b;font-size:15px">🚚 ${escapeHtml(nm)} <span style="color:#888;font-weight:700">(${arr.filter(d=>d.revisado).length}/${arr.length})</span></div>
-          ${rev.length?`<button type="button" class="btn-primary" data-rev-entregar="${nm.replace(/"/g,"&quot;")}" style="padding:8px 12px;font-size:12px;background:#10b981">Dejados: marcar ${rev.length} como Entregado</button>`:""}</div>
+          <div style="font-weight:900;color:#f59e0b;font-size:15px;margin:0 0 8px">🚚 ${escapeHtml(nm)} <span style="color:#888;font-weight:700">(${arr.filter(d=>d.revisado).length}/${arr.length})</span></div>
+          ${rev.length?`<button type="button" class="btn-primary" data-rev-entregar="${nm.replace(/"/g,"&quot;")}" style="display:block;width:100%;margin:0 0 8px;padding:10px 12px;font-size:13px;background:#10b981">✅ Dejados: marcar ${rev.length} como Entregado</button>`:""}
           ${arr.map(d=>{
             const ch=chequeosRevision(d);
-            return `<div class="card" style="padding:12px 14px;margin-bottom:8px;border-color:${d.revisado?"rgba(16,185,129,.35)":ch.faltan.length?"rgba(239,68,68,.3)":"rgba(255,255,255,.07)"}">
-              <div style="display:flex;gap:10px;align-items:flex-start">
-                <input type="checkbox" data-rev-chk="${d.id}" ${d.revisado?"checked":""} style="width:24px;height:24px;margin-top:2px;flex:none" aria-label="Revisado" />
-                <div style="flex:1;min-width:0">
-                  <div style="font-weight:800;font-size:15px">${escapeHtml(d.nombre||"(sin nombre)")} <span style="color:#888;font-weight:600;font-size:12px">${d.nDoc?"N° "+escapeHtml(d.nDoc):""}${d.bultos?" · "+escapeHtml(d.bultos)+" bulto(s)":""}</span></div>
-                  <div style="font-size:12px;color:#aaa;margin:2px 0 6px">${d.destino==="provincia"?"📦 Región":"🏢 Oficina"}${d.direccionDestino?" · "+escapeHtml(d.direccionDestino):""}</div>
-                  <div style="display:flex;gap:6px;flex-wrap:wrap">${ch.ok.map(t=>`<span style="font-size:11px;color:#10b981;background:rgba(16,185,129,.1);border-radius:8px;padding:3px 8px">✅ ${t}</span>`).join("")}${ch.faltan.map(t=>`<span style="font-size:11px;color:#ef4444;background:rgba(239,68,68,.12);border-radius:8px;padding:3px 8px;font-weight:800">⚠️ Falta ${t}</span>`).join("")}</div>
-                </div>
-                <button type="button" class="btn-secondary" data-rev-abrir="${d.id}" style="padding:6px 10px;font-size:12px;flex:none">Abrir</button>
-              </div></div>`;
+            const faltan=ch.faltan.length;
+            return `<div class="card" style="position:relative;display:block;padding:12px 74px 12px 52px;margin-bottom:8px;border-color:${d.revisado?"rgba(16,185,129,.35)":faltan?"rgba(239,68,68,.3)":"rgba(255,255,255,.07)"}">
+              <input type="checkbox" data-rev-chk="${d.id}" ${d.revisado?"checked":""} style="position:absolute;left:14px;top:14px;width:26px;height:26px" aria-label="Revisado" />
+              <button type="button" class="btn-secondary" data-rev-abrir="${d.id}" style="position:absolute;right:10px;top:10px;padding:7px 10px;font-size:12px">Abrir</button>
+              <div style="font-weight:800;font-size:15px;line-height:1.25;word-break:break-word">${escapeHtml(d.nombre||"(sin nombre)")}</div>
+              <div style="font-size:12px;color:#aaa;margin-top:3px;line-height:1.4;word-break:break-word">${d.rut?escapeHtml(d.rut)+" · ":""}${escapeHtml(getAgencyLabel(d)||"-")} · ${d.destino==="provincia"?"📦 Región":"🏢 Oficina"}${d.direccionDestino?" · "+escapeHtml(d.direccionDestino):""}</div>
+              <div style="margin-top:6px;font-size:11px;line-height:1.8">${faltan?ch.faltan.map(t=>`<span style="display:inline-block;color:#ef4444;background:rgba(239,68,68,.12);border-radius:8px;padding:2px 8px;margin-right:4px;font-weight:800">⚠️ Falta ${t}</span>`).join(""):`<span style="color:#10b981;font-weight:800">✅ Datos completos</span>`}</div>
+            </div>`;
           }).join("")}
         </div>`;
       }).join(""):`<div class="empty">${todos.length?"🎉 Todo revisado.":"No hay pedidos empacados para despachar."}</div>`}
