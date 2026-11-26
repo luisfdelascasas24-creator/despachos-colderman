@@ -481,37 +481,56 @@ function inferNombre(lines,text){
   return nombre;
 }
 
+// Valida el dígito verificador de un RUT chileno (módulo 11). Sirve para detectar cuando el OCR
+// se equivocó en algún número: un RUT mal leído casi siempre deja de cuadrar con su dígito final.
+function rutLimpio(r){ return String(r||"").replace(/[^0-9kK]/g,"").toUpperCase(); }
+function validarRut(r){
+  const c=rutLimpio(r); if(c.length<8||c.length>9) return false;
+  const cuerpo=c.slice(0,-1), dv=c.slice(-1);
+  if(!/^\d+$/.test(cuerpo)) return false;
+  let suma=0, mult=2;
+  for(let i=cuerpo.length-1;i>=0;i--){ suma+=+cuerpo[i]*mult; mult=mult===7?2:mult+1; }
+  const resto=11-(suma%11);
+  const esperado=resto===11?"0":resto===10?"K":String(resto);
+  return dv===esperado;
+}
+function formatearRut(r){
+  const c=rutLimpio(r); if(c.length<2) return String(r||"");
+  const cuerpo=c.slice(0,-1).replace(/\B(?=(\d{3})+(?!\d))/g,".");
+  return cuerpo+"-"+c.slice(-1);
+}
+const RUT_COLDERMAN="776078050";
 function inferRut(text,lines){
-  // Igual que con el teléfono: ubicamos primero dónde empieza el bloque del cliente,
-  // para no agarrar por error el RUT de Colderman que aparece arriba en el encabezado.
+  // Ubicamos primero dónde empieza el bloque del cliente (y dónde termina: la tabla de productos),
+  // para no agarrar el RUT de Colderman del encabezado ni números sueltos de otras partes.
   let anchor=-1;
   for(let i=0;i<lines.length;i++){
     const l=lines[i].toUpperCase();
-    if(/SE[NÑ]OR(?:ES)?|SENOR(?:ES)?|CLIENTE|DESTINATARIO|A NOMBRE|RAZON SOCIAL/.test(l)){
-      anchor=i; break;
-    }
+    if(/SE\s*[NÑ]\s*OR(?:\s*ES)?|SENOR(?:\s*ES)?|CLIENTE|DESTINATARIO|A\s*NOMBRE|RAZON\s*SOCIAL/.test(l)){ anchor=i; break; }
   }
-  const zona=anchor===-1?lines:lines.slice(anchor);
-  const rutPattern=/(\d{1,2}[.\s]?\d{3}[.\s]?\d{3}-[\dkK]|\d{7,8}-[\dkK])/;
-  let rut="";
-  for(let i=0;i<zona.length;i++){
-    const l=zona[i].toUpperCase();
-    if(/\bRUT\b/.test(l)){
-      const m=zona[i].match(rutPattern);
-      if(m){ rut=m[1]; break; }
+  const fin=lines.findIndex((x,i)=>i>=Math.max(anchor,0) && /^CANTIDAD\b/i.test(x.trim()));
+  const zona=lines.slice(anchor===-1?0:anchor, fin===-1?undefined:fin);
+  const rutRe=/(\d{1,2}\s?[.,]?\s?\d{3}\s?[.,]?\s?\d{3}\s?[-–—]\s?[\dkK]|\d{7,8}\s?[-–—]\s?[\dkK])/g;
+  const candidatos=(arr)=>{
+    const out=[];
+    for(const l of arr){
+      const etiqueta=/\bRUT\b/i.test(l);
+      for(const m of l.matchAll(rutRe)){
+        const limpio=rutLimpio(m[1]);
+        if(limpio===RUT_COLDERMAN) continue; // nunca el RUT de Colderman
+        out.push({rut:formatearRut(m[1]),etiqueta,valido:validarRut(m[1])});
+      }
     }
-  }
-  if(!rut){
-    // Si no hay una línea con la palabra RUT, buscamos cualquier RUT dentro de la zona del cliente
-    for(const l of zona){
-      const m=l.match(rutPattern);
-      if(m){ rut=m[1]; break; }
-    }
-  }
-  if(!rut && anchor===-1){
-    // Última opción: si ni siquiera encontramos el bloque del cliente, buscamos en todo el texto
-    const m=text.match(rutPattern);
-    if(m) rut=m[1];
+    return out;
+  };
+  const elegir=(cs)=>{
+    return (cs.find(c=>c.valido&&c.etiqueta)||cs.find(c=>c.valido)||cs.find(c=>c.etiqueta)||cs[0]||{}).rut||"";
+  };
+  let rut=elegir(candidatos(zona));
+  // Si en la zona del cliente no hubo ninguno válido, buscamos en todo el documento un RUT válido
+  if(!rut || !validarRut(rut)){
+    const global=candidatos(lines).filter(c=>c.valido);
+    if(global.length) rut=(global.find(c=>c.etiqueta)||global[0]).rut;
   }
   return rut;
 }
@@ -1670,7 +1689,7 @@ function renderNuevo(){
         <button type="button" id="btnBuscarBsale" class="btn-secondary" style="width:100%;margin-top:8px">🔍 Buscar en Bsale</button>
         <div id="bsaleResultados"></div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div class="field"><label>RUT</label><input id="fRut" value="${escapeHtml(f.rut)}" placeholder="Ej: 12.345.678-9" autocomplete="off" /></div><div class="field"><label>N° Cotización / Factura / Boleta</label><input id="fNDoc" value="${escapeHtml(f.nDoc)}" placeholder="Ej: 5065" autocomplete="off" /></div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div class="field"><label>RUT</label><input id="fRut" value="${escapeHtml(f.rut)}" placeholder="Ej: 12.345.678-9" autocomplete="off" /><div id="rutAviso" style="font-size:12px;color:#ef4444;font-weight:800;margin-top:4px">${f.rut&&!validarRut(f.rut)?"⚠️ El dígito verificador no calza: revisa el RUT":""}</div></div><div class="field"><label>N° Cotización / Factura / Boleta</label><input id="fNDoc" value="${escapeHtml(f.nDoc)}" placeholder="Ej: 5065" autocomplete="off" /></div></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div class="field"><label>Cantidad de bultos</label><input id="fBultos" type="number" min="1" value="${escapeHtml(f.bultos)}" placeholder="Ej: 3" /></div><div class="field"><label>Tracking</label><input id="fTracking" value="${escapeHtml(f.tracking)}" placeholder="Opcional / si ya lo tienes" /></div></div>
       <div class="section-sep">⚠️ Productos (verifica el código con cuidado)</div>
       <div id="productosList">${(f.productos||[]).map((p,idx)=>`
@@ -1813,7 +1832,7 @@ function bindNuevo(){
   document.addEventListener("paste",onPasteNuevo); window._pasteNuevoCleanup=()=>document.removeEventListener("paste",onPasteNuevo);
   document.getElementById("fNombre").oninput=e=>{state.form.nombre=e.target.value;};
   const btnBuscarBsale=document.getElementById("btnBuscarBsale"); if(btnBuscarBsale) btnBuscarBsale.onclick=()=>buscarClienteBsale(false);
-  document.getElementById("fRut").oninput=e=>{state.form.rut=e.target.value;};
+  document.getElementById("fRut").oninput=e=>{state.form.rut=e.target.value; const av=document.getElementById("rutAviso"); if(av) av.textContent=(e.target.value&&!validarRut(e.target.value))?"⚠️ El dígito verificador no calza: revisa el RUT":"";};
   document.getElementById("fNDoc").oninput=e=>{state.form.nDoc=e.target.value;};
   const fTel=document.getElementById("fTelefono"); if(fTel) fTel.oninput=e=>{state.form.telefono=e.target.value;};
   document.getElementById("fBultos").oninput=e=>{state.form.bultos=e.target.value;};
